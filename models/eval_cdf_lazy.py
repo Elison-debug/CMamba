@@ -2,15 +2,11 @@
 # models/eval_cdf_lazy.py
 import argparse, os, time
 from pathlib import Path
-
-import numpy as np
-import torch
+import numpy as np, torch
 from torch.utils.data import DataLoader
-import matplotlib
-matplotlib.use("Agg")
+import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-
 from datasets.frames_lazy import FramesLazyDataset
 from models.mamba_regressor import MambaRegressor
 
@@ -31,8 +27,11 @@ def euclid_err(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--features_root", type=str, required=True)
-    ap.add_argument("--ckpt", type=str, required=True)
     # 会被 ckpt 覆盖（若存在），提供默认值即可
+    ap.add_argument("--ckpt", type=str, required=True)
+    # 新增：显式 eval 根目录；若不给则从 ckpt.meta 读取；再退化到 features_root/eval
+    ap.add_argument("--eval_root", type=str, default=None)
+
     ap.add_argument("--seq_len", type=int, default=12)
     ap.add_argument("--input_dim", type=int, default=2000)
     ap.add_argument("--proj_dim", type=int, default=64)
@@ -53,7 +52,7 @@ def main():
     ap.add_argument("--live_max_err", type=float, default=10.0, help="直方图覆盖的最大误差(m)")
     ap.add_argument("--live_every", type=int, default=1, help="每 N 个 batch 刷新一次进度条统计")
 
-    args = ap.parse_args()
+    args, _ = ap.parse_known_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     os.makedirs(args.out_dir, exist_ok=True)
@@ -61,35 +60,38 @@ def main():
     # -------- 载入 ckpt，并用其中训练配置覆盖本地 args --------
     ckpt = torch.load(args.ckpt, map_location="cpu")
     train_args = ckpt.get("args", {}) or {}
+
     for k in ["seq_len", "input_dim", "proj_dim", "d_model", "n_layer", "patch_len", "stride", "predict"]:
         if k in train_args:
             setattr(args, k, train_args[k])
-
-    # -------- 构造验证集（优先使用 ckpt.meta.val_files）--------
+   
+    # 解析 eval 文件列表/目录 构造验证集（优先使用 ckpt.meta.val_files
     meta = ckpt.get("meta", {}) or {}
-    if "val_files" in meta and meta["val_files"]:
-        val_files = [Path(p) for p in meta["val_files"]]
+    if args.eval_root is None:
+        if "val_files" in meta and meta["val_files"]:
+            val_files = [Path(p) for p in meta["val_files"]]
+            eval_root = Path(val_files[0]).parent if val_files else None
+        else:
+            root = Path(args.features_root) if args.features_root else None
+            if root is None: raise SystemExit("Provide --eval_root or --features_root or let ckpt.meta provide val_files")
+            eval_root = root/"eval"
+            val_files = sorted(eval_root.glob("*.npz"))
     else:
-        root = Path(args.features_root)
-        files = sorted(root.glob("*.npz"))
-        if not files:
-            raise FileNotFoundError(f"No .npz under {root}")
-        import random
-        rnd = random.Random(args.seed)
-        rnd.shuffle(files)
-        cut = int(len(files) * 0.8)
-        val_files = files[cut:] or files[:1]
+        eval_root = Path(args.eval_root)
+        val_files = sorted(eval_root.glob("*.npz"))
+    if not val_files:
+        raise FileNotFoundError(f"No .npz under {eval_root}")
+
 
     print(f"[CFG] seq_len={args.seq_len}, proj_dim={args.proj_dim}, d_model={args.d_model}, "
           f"n_layer={args.n_layer}, patch_len={args.patch_len}, stride={args.stride}, predict={args.predict}")
     print(f"[VAL] files={len(val_files)}")
 
-    va_ds = FramesLazyDataset.from_filelist(val_files, seq_len=args.seq_len, predict=args.predict, mmap=True)
-    va = DataLoader(
-        va_ds, batch_size=args.batch_size, shuffle=False,
-        num_workers=max(1, args.workers // 2), pin_memory=True,
-        persistent_workers=(args.workers > 0), prefetch_factor=2
-    )
+    # 数据集：强制使用 train 统计
+    stats_root = Path(meta.get("train_root", eval_root.parent)) # type: ignore
+    va_ds = FramesLazyDataset.from_filelist(val_files, seq_len=train_args.get("seq_len", 12), predict=train_args.get("predict", "next"), mmap=True, stats_root=stats_root)
+    va = DataLoader(va_ds, batch_size=args.batch_size, shuffle=False, num_workers=max(1, args.workers//2), pin_memory=True, persistent_workers=(args.workers>0), prefetch_factor=2)
+
 
     # -------- 模型 --------
     model = MambaRegressor(

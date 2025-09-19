@@ -40,8 +40,8 @@ def get_amp(enabled: bool):
 
 
 # ---------------------- LR schedule ----------------------
-def make_warmup_cosine(total_steps: int, target_lr: float, warmup_ratio: float = 0.05, min_lr: float = 1e-6):
-    warmup_steps = max(1000, int(warmup_ratio * total_steps))
+def make_warmup_cosine(total_steps: int, target_lr: float, warmup_ratio: float = 0.05, min_lr: float = 1e-5):
+    warmup_steps = max(200, min(1500, int(round(total_steps * warmup_ratio))))
 
     def lr_at(step: int) -> float:
         if step < warmup_steps:
@@ -49,6 +49,22 @@ def make_warmup_cosine(total_steps: int, target_lr: float, warmup_ratio: float =
         prog = (step - warmup_steps) / max(1, total_steps - warmup_steps)
         return min_lr + 0.5 * (target_lr - min_lr) * (1.0 + math.cos(math.pi * prog))
     return lr_at
+
+#constant lr
+def make_constant(target_lr: float):
+    def lr_at(step: int) -> float:
+        return target_lr
+    return lr_at
+
+# cosine decay
+def make_cosine(total_steps: int,
+                target_lr: float,
+                min_lr: float = 1e-6):
+    def lr_at(step: int) -> float:
+        prog = step / max(1, total_steps)
+        return min_lr + 0.5 * (target_lr - min_lr) * (1.0 + math.cos(math.pi * prog))
+    return lr_at
+
 
 
 # ---------------------- Loss: Huber over Euclidean error ----------------------
@@ -68,9 +84,11 @@ def epe_huber_loss(yp: torch.Tensor, yb: torch.Tensor, beta: float) -> Tuple[tor
 def main():
     ap = argparse.ArgumentParser()
     # Data / split
-    ap.add_argument("--features_root", type=str, required=True)
+    ap.add_argument("--features_root", type=str, default="./data/features/")
+    ap.add_argument("--train_root", type=str, default=None)
+    ap.add_argument("--val_root",   type=str, default=None)
     ap.add_argument("--seq_len", type=int, required=True)
-    ap.add_argument("--input_dim", type=int, required=True)    # Din per frame
+    ap.add_argument("--input_dim", type=int, required=True)
     ap.add_argument("--predict", choices=["current", "next"], default="next")
     ap.add_argument("--workers", type=int, default=4)
 
@@ -98,8 +116,8 @@ def main():
     ap.add_argument("--amp", action="store_true")
     ap.add_argument("--seed", type=int, default=1234)
     ap.add_argument("--out_dir", type=str, default="./ckpt")
-    args = ap.parse_args()
-
+    #args = ap.parse_args()
+    args, _ = ap.parse_known_args()
     # Repro
     torch.manual_seed(args.seed)
     if torch.cuda.is_available():
@@ -111,31 +129,29 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # ---------- deterministic split by files ----------
-    root = Path(args.features_root)
-    files = sorted(root.glob("*.npz"))
-    if not files:
-        raise FileNotFoundError(f"No .npz under {root}")
+    if args.train_root is None and args.val_root is None:
+        if args.features_root is None:
+            raise SystemExit("Provide --train_root/--val_root or --features_root (containing train/ and eval/)")
+        args.train_root = str(Path(args.features_root) / "train")
+        args.val_root   = str(Path(args.features_root) / "eval")
 
-    import random
-    rnd = random.Random(args.seed)
-    rnd.shuffle(files)
-    cut = int(len(files) * 0.8)
-    train_files = files[:cut]
-    val_files = files[cut:] or files[:1]
+    tr_dir = Path(args.train_root); va_dir = Path(args.val_root)
+    if not tr_dir.exists(): raise FileNotFoundError(f"train_root not found: {tr_dir}")
+    if not va_dir.exists(): raise FileNotFoundError(f"val_root not found: {va_dir}")
 
-    tr_ds = FramesLazyDataset.from_filelist(train_files, seq_len=args.seq_len, predict=args.predict, mmap=True)
-    va_ds = FramesLazyDataset.from_filelist(val_files,   seq_len=args.seq_len, predict=args.predict, mmap=True)
+    # 构建数据集：显式使用 train/eval 目录
+    tr_files = sorted(tr_dir.glob("*.npz"))
+    va_files = sorted(va_dir.glob("*.npz")) or sorted(tr_dir.glob("*.npz"))[:1]
 
-    tr = DataLoader(tr_ds, batch_size=args.batch_size, shuffle=True,
-                    num_workers=args.workers, pin_memory=True, drop_last=True,
-                    persistent_workers=(args.workers > 0), prefetch_factor=2)
-    va = DataLoader(va_ds, batch_size=args.batch_size, shuffle=False,
-                    num_workers=max(1, args.workers // 2), pin_memory=True, drop_last=False,
-                    persistent_workers=(args.workers > 0), prefetch_factor=2)
+    stats_root = tr_dir.parent  # 强制使用 train 统计
+    tr_ds = FramesLazyDataset.from_filelist(tr_files, seq_len=args.seq_len, predict=args.predict, mmap=True, stats_root=stats_root)
+    va_ds = FramesLazyDataset.from_filelist(va_files, seq_len=args.seq_len, predict=args.predict, mmap=True, stats_root=stats_root)
 
-    print(f"[SPLIT] train files={len(train_files)}  val files={len(val_files)}")
-    print(f"[INFO]  train samples={len(tr_ds)} (steps/epoch={len(tr)}) | "
-          f"val samples={len(va_ds)} (steps/epoch={len(va)})")
+    tr = DataLoader(tr_ds, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=True, drop_last=True, persistent_workers=(args.workers>0), prefetch_factor=2)
+    va = DataLoader(va_ds, batch_size=args.batch_size, shuffle=False, num_workers=max(1, args.workers//2), pin_memory=True, drop_last=False, persistent_workers=(args.workers>0), prefetch_factor=2)
+
+    print(f"[SPLIT] train files={len(tr_files)}  val files={len(va_files)}")
+    print(f"[INFO]  train samples={len(tr_ds)} | val samples={len(va_ds)}")
 
     # ---------- model ----------
     model = MambaRegressor(
@@ -163,8 +179,9 @@ def main():
 
     # LR schedule
     total_steps = max(1, args.epochs * len(tr))
-    lr_fn = make_warmup_cosine(total_steps, args.lr)
-
+    #lr_fn = make_warmup_cosine(total_steps, args.lr)
+    lr_fn = make_constant(args.lr)
+    
     def set_lr(lr: float):
         for g in opt.param_groups: g["lr"] = lr
 
@@ -245,7 +262,7 @@ def main():
             mean_epe = sum_err  / max(1, seen)
 
             # 打印更有信息量的日志
-            grad_disp = f"{grad_norm:.3e}" if did_step else "-"
+            grad_disp = f"{grad_norm:.3e}"
             pbar.set_postfix(
                 avg_loss=f"{avg_loss:.4f}",
                 mean_pos_err_m=f"{mean_epe:.3f}",
@@ -262,6 +279,16 @@ def main():
         p = out_dir / base
         if not p.exists(): return str(p)
         patt = re.compile(r"best(\d*)\.pt")
+        maxn = 1
+        for f in out_dir.glob("best*.pt"):
+            m = patt.fullmatch(f.name)
+            if m:
+                n = int(m.group(1) or "1"); maxn = max(maxn, n)
+        return str(out_dir / f"best{maxn+1}.pt")
+    def next_ckpt_epe_path(base: str) -> str:
+        p = out_dir / base
+        if not p.exists(): return str(p)
+        patt = re.compile(r"best(\d*)_epe\.pt")
         maxn = 1
         for f in out_dir.glob("best*.pt"):
             m = patt.fullmatch(f.name)
@@ -291,8 +318,8 @@ def main():
             path = next_ckpt_path("best.pt")
             state = {"model": model.state_dict(),
                      "args": vars(args),
-                     "meta": {"train_files": [str(p) for p in train_files],
-                              "val_files":   [str(p) for p in val_files],
+                     "meta": {"train_files": [str(p) for p in tr_files],
+                              "val_files":   [str(p) for p in va_files],
                               "val_loss": float(va_loss),
                               "val_epe_m": float(va_epe)}}
             if ema is not None:
@@ -304,11 +331,11 @@ def main():
         # 以 EPE 选主 best
         if va_epe < best_epe:
             best_epe = va_epe
-            path = next_ckpt_path("best_epe.pt")
+            path = next_ckpt_epe_path("best_epe.pt")
             state = {"model": model.state_dict(),
                      "args": vars(args),
-                     "meta": {"train_files": [str(p) for p in train_files],
-                              "val_files":   [str(p) for p in val_files],
+                     "meta": {"train_files": [str(p) for p in tr_files],
+                              "val_files":   [str(p) for p in va_files],
                               "val_loss": float(va_loss),
                               "val_epe_m": float(va_epe)}}
             if ema is not None:

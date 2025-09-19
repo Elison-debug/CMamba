@@ -6,9 +6,8 @@
   --gt_dir=./data/ground_truth/radio `
   --out_dir=./data/features   `
   --taps=10 --fps=100 `
-  --pos_units=mm --dtype=float16
-
-
+  --pos_units=mm --dtype=float16 `
+  --split=0.8
 
 
 
@@ -23,6 +22,16 @@
   --wd=0.01 --out_dir=./ckpt `
   --amp --accum=4
   
+  #train & eval
+  python -m models.train_regression_lazy `
+  --features_root=./data/features `
+  --seq_len=12 --input_dim=2000 `
+  --proj_dim=64 --d_model=128 `
+  --n_layer=4 --patch_len=8 `
+  --stride=4 --batch_size=32 `
+  --epochs=60 --lr=3e-4 `
+  --wd=0.05 --out_dir=./ckpt `
+  --amp --accum=4
   
   
   #eval
