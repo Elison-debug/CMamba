@@ -96,6 +96,25 @@ class FramesLazyDataset(Dataset):
                 f"No samples built: files={len(self.files)}, missing_keys={missing_keys}, "
                 f"total_frames={total_frames}, seq_len={self.seq_len}, predict={self.predict}"
             )
+        self.stats = None
+        # 约定：stats.npz 放在数据文件所在目录（或它的父目录），先就近找
+        from pathlib import Path
+        if len(self.files) > 0:
+            p0 = Path(self.files[0]).parent
+            cand = [p0/"stats.npz", p0.parent/"stats.npz"]
+            for sp in cand:
+                if sp.exists():
+                    s = np.load(sp)
+                    m = s["feat_mean"].astype(np.float32)
+                    sd = s["feat_std"].astype(np.float32)
+                    if "Din" in s and int(s["Din"]) != m.shape[0]:
+                        print(f"[WARN] stats Din mismatch: stats={int(s['Din'])} != data={m.shape[0]}")
+                    # 下限：优先 stats 里的 std_floor；否则 1e-3
+                    std_floor = float(s["std_floor"]) if "std_floor" in s else 1e-3
+                    sd = np.maximum(sd, std_floor).astype(np.float32)
+                    self.stats = (m, sd)
+                    print(f"[OK] Loaded stats: {sp} Din={m.shape[0]}")
+                    break
 
     def __len__(self) -> int:
         return len(self.index)
@@ -115,7 +134,11 @@ class FramesLazyDataset(Dataset):
         d = self._load_file(fi)
         x = d["feats"][s:t].astype(np.float32)  # (K, Din)
         y = d["xy"][t].astype(np.float32)       # (2,)
-
+        # 若有 stats，进行在线标准化（逐样本逐维）
+        if self.stats is not None:
+            m, sd = self.stats
+            # 形状兼容：x (K,Din), m/sd (Din,)
+            x = (x - m) / sd
         # 基础健壮性：把非数/无穷替换掉，避免上游偶发 NaN 污染训练
         if not np.isfinite(x).all():
             x = np.nan_to_num(x, nan=0.0, posinf=1e6, neginf=-1e6)

@@ -13,7 +13,6 @@ Notes:
 - Patch settings: patch_len=8, stride=4 by default (can be overridden).
 - d_model ties to your CMamba's hidden width.
 """
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
 # Import your CMamba & ModelArgs (adjust module path if needed)
@@ -35,6 +34,7 @@ class MambaRegressor(nn.Module):
         super().__init__()
         self.Din = Din
         self.K = K
+        self.input_norm = nn.LayerNorm(proj_dim)
         self.proj = nn.Linear(Din, proj_dim)  # frame-wise projection to C
         # Build CMamba config
         args = ModelArgs(
@@ -67,8 +67,7 @@ class MambaRegressor(nn.Module):
                 x = F.pad(x, (0, 0, pad, 0))
             K = self.K  # 同步更新（仅用于后续 sanity）
         x = self.proj(x)            # (B,K,C)
-        x = torch.clamp(x, -5, 5)         # 限幅，避免个别异常激活炸 SSM
-        x = x / (x.detach().abs().mean() + 1e-6)  # 轻量自适应缩放  
+        x = self.input_norm(x)      # 替代全局均值缩放
         x = x.permute(0,2,1)        # (B,C,K)
         y = self.backbone(x)        # (B,C,Tout) -- 注意 Tout 可能是 1 或被 pad 成 8
         # --- 关键修复：把最后时间维压成标量 ---

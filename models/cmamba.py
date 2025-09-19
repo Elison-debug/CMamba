@@ -40,13 +40,13 @@ class ChannelMixup(nn.Module):
         super().__init__()
         self.sigma = sigma
 
+    # --- ChannelMixup.forward 修复设备一致性 ---
     def forward(self, x):
-        if self.training:
+        if self.training and self.sigma > 0:
             B, V, L = x.shape
-            perm = torch.randperm(V)
-            lambda_ = torch.normal(mean=0, std=self.sigma, size=(V,)).to(x.device)
-            x_mixed = x + lambda_.unsqueeze(1) * x[:, perm]
-            return x_mixed
+            perm = torch.randperm(V, device=x.device)                         # ← 修复
+            lambda_ = torch.normal(0, self.sigma, size=(V,), device=x.device) # ← 修复
+            return x + lambda_.unsqueeze(1) * x[:, perm]
         return x
 
 class ChannelAttention(nn.Module):
@@ -96,37 +96,86 @@ class CMamba(nn.Module):
         self.args = args
         self.channel_mixup = ChannelMixup(args.sigma)
         self.patch_embedding = nn.Linear(args.patch_len * args.num_channels, args.d_model)
-        self.pos_encoding = nn.Parameter(torch.randn(1, args.num_patches, args.d_model))
+        #self.pos_encoding = nn.Parameter(torch.randn(1, args.num_patches, args.d_model))
         
         self.c_mamba_blocks = nn.ModuleList([CMambaBlock(args) for _ in range(args.n_layer)])
         
         self.norm_f = RMSNorm(args.d_model)
         self.output_layer = nn.Linear(args.d_model * args.num_patches, args.num_channels * args.forecast_len)
 
+    # --- 位置编码（可选：改为正弦）---
+    def _build_sincos(self, n: int, d: int, device=None, dtype=None):
+        """
+        生成 (n, d) 的正弦位置编码：
+        pe[:, 0::2] ← sin(pos / 10000^(2i/d))
+        pe[:, 1::2] ← cos(pos / 10000^(2i/d))
+        兼容 d 为奇/偶；广播尺寸严格匹配。
+        """
+        if device is None:
+            device = torch.device("cpu")
+        if dtype is None:
+            dtype = torch.float32
+
+        pos = torch.arange(n, device=device, dtype=dtype).unsqueeze(1)  # (n, 1)
+
+        # 偶数位数量和奇数位数量（列数）
+        sin_cols = (d + 1) // 2   # ceil(d/2)
+        cos_cols = d // 2         # floor(d/2)
+
+        # 指数的分母是 d/2（来自 2i/d）
+        denom = (d / 2.0)
+
+        # 分别构造 sin 和 cos 的频率尺度，形状为 (1, cols)
+        sin_i = torch.arange(sin_cols, device=device, dtype=dtype)  # 0..ceil(d/2)-1
+        cos_i = torch.arange(cos_cols, device=device, dtype=dtype)  # 0..floor(d/2)-1
+
+        sin_div = torch.exp(-math.log(10000.0) * sin_i / denom).unsqueeze(0)  # (1, sin_cols)
+        cos_div = torch.exp(-math.log(10000.0) * cos_i / denom).unsqueeze(0)  # (1, cos_cols)
+
+        # 广播： (n,1) * (1,cols) → (n,cols)
+        sin_part = torch.sin(pos * sin_div)  # (n, sin_cols)
+        cos_part = torch.cos(pos * cos_div)  # (n, cos_cols)
+
+        # 组装到 (n,d)；奇数 d 时，最后一个偶数位会只有 sin，没有对应的 cos，是标准做法
+        pe = torch.zeros(n, d, device=device, dtype=dtype)
+        pe[:, 0::2] = sin_part
+        if cos_cols > 0:
+            pe[:, 1::2] = cos_part
+
+        return pe
+
+
     def forward(self, input_ids):
         print("input_ids", input_ids.shape) if self.args.v else None
         x = self.channel_mixup(input_ids)
         print("after channel mixup", x.shape) if self.args.v else None
         # Patching
-        B, V, L = x.shape
-        P = self.args.patch_len
-        S = self.args.stride
-
+        # B, V, L = x.shape
+        # P = self.args.patch_len
+        # S = self.args.stride
         # Manual patching
-        patches = []
-        for i in range(0, L - P + 1, S):
-            patch = x[:, :, i:i+P].reshape(B, -1)
-            patches.append(patch)
-        num_patches = (L - P) // S + 1
-        print(f"Calculated number of patches: {num_patches}") if self.args.v else None
+        # patches = []
+        # for i in range(0, L - P + 1, S):
+        #     patch = x[:, :, i:i+P].reshape(B, -1)
+        #     patches.append(patch)
+        # x: (B, V, L), P=self.args.patch_len, S=self.args.stride
 
-        x = torch.stack(patches, dim=1)  # (B, num_patches, V*P)
-        print("after patching", x.shape) if self.args.v else None
+        B, V, L = x.shape; P = self.args.patch_len; S = self.args.stride
+        x = x.unfold(2, P, S).contiguous()            # (B,V,num_patches,P)
+        x = x.permute(0,2,1,3).reshape(B, -1, V*P)    # (B,num_patches,V*P)
+        #print(f"Calculated number of patches: {num_patches}") if self.args.v else None
+
+        #x = torch.stack(patches, dim=1)  # (B, num_patches, V*P)
+        #print("after patching", x.shape) if self.args.v else None
         # Patch embedding
         x = self.patch_embedding(x)  # (B, num_patches, d_model)
         print("after patch embedding", x.shape) if self.args.v else None
+        # x: (B, K, V*P)
+        
         # Adjust positional encoding
-        pos_encoding = self.pos_encoding[:, :x.size(1), :]
+        pos_encoding = self._build_sincos(n=x.size(1), d=self.args.d_model,
+                                  device=x.device, dtype=x.dtype).unsqueeze(0)  # (1,K,d_model)
+        
         print(f"Positional encoding shape: {pos_encoding.shape}") if self.args.v else None
         # Add positional encoding
         x = x + pos_encoding
@@ -176,7 +225,7 @@ class MambaBlock(nn.Module):
         (b, l, d) = x.shape
         
         x_and_res = self.in_proj(self.norm_in(x))  # ← 使用归一化后的输入
-        x_and_res = torch.clamp(x_and_res, -6.0, 6.0)        # ← 新增：限幅
+        #x_and_res = torch.clamp(x_and_res, -6.0, 6.0)        # ← 新增：限幅
         if torch.isnan(x).any(): print("[DBG] NaN after in_proj")
         (x, res) = x_and_res.split(split_size=[self.args.d_inner, self.args.d_inner], dim=-1)
 
@@ -186,18 +235,18 @@ class MambaBlock(nn.Module):
         x = rearrange(x, 'b d_in l -> b l d_in')
         
         x = F.silu(x)
-        x = torch.nan_to_num(x, nan=0.0, posinf=1e6, neginf=-1e6)  # ← 新增
+        #x = torch.nan_to_num(x, nan=0.0, posinf=1e6, neginf=-1e6)  # ← 新增
         y = self.ssm(x)
         if torch.isnan(y).any(): print("[DBG] NaN after ssm()")
         #y = y * F.silu(res)
         
         # ④ 残差分支限幅后再乘，用 RMSNorm 的输入不会被无限放大
         res_gated = F.silu(res)
-        res_gated = torch.clamp(res_gated, -6.0, 6.0)        # ← 新增：限幅
+        #res_gated = torch.clamp(res_gated, -6.0, 6.0)        # ← 新增：限幅
         y = y * res_gated
         
         output = self.out_proj(y)
-        output = torch.nan_to_num(output, nan=0.0, posinf=1e6, neginf=-1e6)  # ← 新增
+        #output = torch.nan_to_num(output, nan=0.0, posinf=1e6, neginf=-1e6)  # ← 新增
         return output
 
     def ssm(self, x):
@@ -229,7 +278,7 @@ class MambaBlock(nn.Module):
         
         (delta, B, C) = x_dbl.split(split_size=[self.args.dt_rank, n, n], dim=-1)  # delta: (b, l, dt_rank). B, C: (b, l, n)
         delta = F.softplus(self.dt_proj(delta))  # (b, l, d_in)
-        delta = delta.clamp(1e-4, 5.0)           # ← 新增：避免过小/过大
+        #delta = delta.clamp(1e-4, 5.0)           # ← 新增：避免过小/过大
         y = self.selective_scan(x, delta, A, B, C, D)  # This is similar to run_SSM(A, B, C, u) in The Annotated S4 [2]
         
         return y
@@ -245,7 +294,7 @@ class MambaBlock(nn.Module):
         #   "A is the more important term and the performance doesn't change much with the simplification on B"
         # deltaA = torch.exp(einsum(delta, A, 'b l d_in, d_in n -> b l d_in n'))
         z = einsum(delta, A, 'b l d_in, d_in n -> b l d_in n')  # 原来直接 exp(...)
-        z = torch.clamp(z, min=-20.0, max=20.0)
+        #z = torch.clamp(z, min=-20.0, max=20.0)
         deltaA = torch.exp(z)  
 
         deltaB_u = einsum(delta, B, u, 'b l d_in, b l n, b l d_in -> b l d_in n')
@@ -257,9 +306,9 @@ class MambaBlock(nn.Module):
         ys = []    
         for i in range(l):
             x = deltaA[:, i] * x + deltaB_u[:, i]
-            x = torch.nan_to_num(x, nan=0.0, posinf=1e6, neginf=-1e6)  # ← 新增
+            #x = torch.nan_to_num(x, nan=0.0, posinf=1e6, neginf=-1e6)  # ← 新增
             y = einsum(x, C[:, i, :], 'b d_in n, b n -> b d_in')
-            y = torch.nan_to_num(y, nan=0.0, posinf=1e6, neginf=-1e6)  # ← 新增
+            #y = torch.nan_to_num(y, nan=0.0, posinf=1e6, neginf=-1e6)  # ← 新增
             ys.append(y)
         y = torch.stack(ys, dim=1)  # shape (b, l, d_in)
         
