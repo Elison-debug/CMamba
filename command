@@ -31,8 +31,15 @@
   --predict=next `
   --batch_size=64 --workers=4 `
   --out_dir=.\eval_out --save_csv
-
-
+  
+  #eval with live plotting and without specifying model structure
+  python -m models.eval_cdf_lazy `
+    --features_root=.\data\features `
+    --ckpt=.\ckpt\best.pt `
+    --out_dir=.\eval_out `
+    --amp `
+    --live_bins=120 --live_max_err=10 --live_every=1 `
+    --save_csv
 
 
 
