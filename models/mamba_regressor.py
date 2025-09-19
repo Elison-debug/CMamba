@@ -15,7 +15,7 @@ Notes:
 """
 import torch
 import torch.nn as nn
-
+import torch.nn.functional as F
 # Import your CMamba & ModelArgs (adjust module path if needed)
 try:
     from models.cmamba import CMamba, ModelArgs
@@ -54,7 +54,18 @@ class MambaRegressor(nn.Module):
 
     def forward(self, x):  # x: (B,K,Din)
         B, K, Din = x.shape
-        assert Din == self.Din and K == self.K, f"Expected (B,{self.K},{self.Din}), got {x.shape}"
+        assert Din == self.Din, f"Expected Din={self.Din}, got {Din}"
+        if K != self.K:
+            if K > self.K:
+                # 多了 → 取最近 self.K 帧
+                x = x[:, -self.K:, :]
+            else:
+                # 少了 → 在时间维前端补零到 self.K
+                pad = self.K - K
+                # F.pad 的维度顺序是 (..., last_dim, second_last_dim, ...)
+                # 这里 pad (features_dim=0, time_dim=pad 前, time_dim 后=0)
+                x = F.pad(x, (0, 0, pad, 0))
+            K = self.K  # 同步更新（仅用于后续 sanity）
         x = self.proj(x)            # (B,K,C)
         x = torch.clamp(x, -5, 5)         # 限幅，避免个别异常激活炸 SSM
         x = x / (x.detach().abs().mean() + 1e-6)  # 轻量自适应缩放  

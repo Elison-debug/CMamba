@@ -1,14 +1,6 @@
-# Write a fixed, production-ready eval_cdf_lazy.py that:
-# - uses absolute imports
-# - deterministic split (prefer ckpt meta; else seed-based split)
-# - keyword-only args for FramesLazyDataset
-# - computes CDF/Hist, saves plots & CSV/NPZ
-# - optional AMP for faster eval, safe fallback
-# - supports predict=current|next
-import os, textwrap, json, pathlib
-
+#!/usr/bin/env python3
 # models/eval_cdf_lazy.py
-import argparse, os, math
+import argparse, os
 from pathlib import Path
 
 import numpy as np
@@ -38,8 +30,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--features_root", type=str, required=True)
     ap.add_argument("--ckpt", type=str, required=True)
-    ap.add_argument("--seq_len", type=int, required=True)
-    ap.add_argument("--input_dim", type=int, required=True)
+    # 下面这些参数会被 ckpt 中的训练配置覆盖（若存在），因此都提供默认值即可
+    ap.add_argument("--seq_len", type=int, default=12)
+    ap.add_argument("--input_dim", type=int, default=2000)
     ap.add_argument("--proj_dim", type=int, default=64)
     ap.add_argument("--d_model", type=int, default=128)
     ap.add_argument("--n_layer", type=int, default=4)
@@ -54,17 +47,31 @@ def main():
     ap.add_argument("--save_csv", action="store_true")
     args = ap.parse_args()
 
+    print(f"[CFG] seq_len={args.seq_len}, proj_dim={args.proj_dim}, d_model={args.d_model}, "
+      f"n_layer={args.n_layer}, patch_len={args.patch_len}, stride={args.stride}, predict={args.predict}")
+
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     os.makedirs(args.out_dir, exist_ok=True)
 
-    # -------- Build dataset split: prefer ckpt meta --------
+    # -------- 载入 ckpt，并用其中的训练配置覆盖本地 args --------
     ckpt = torch.load(args.ckpt, map_location="cpu")
-    meta = ckpt.get("meta", {})
+    train_args = ckpt.get("args", {}) or {}
+
+    # 这些键如果在 ckpt 里有，就覆盖到 args 上（保持与训练一致）
+    for k in ["seq_len","input_dim","proj_dim","d_model","n_layer","patch_len","stride","predict"]:
+        if k in train_args:
+            setattr(args, k, train_args[k])
+
+    # -------- 构造验证集：优先使用 ckpt.meta.val_files --------
+    meta = ckpt.get("meta", {}) or {}
     if "val_files" in meta and meta["val_files"]:
         val_files = [Path(p) for p in meta["val_files"]]
     else:
         root = Path(args.features_root)
         files = sorted(root.glob("*.npz"))
+        if not files:
+            raise FileNotFoundError(f"No .npz under {root}")
         import random
         rnd = random.Random(args.seed)
         rnd.shuffle(files)
@@ -76,84 +83,84 @@ def main():
                     num_workers=max(1,args.workers//2), pin_memory=True,
                     persistent_workers=(args.workers>0), prefetch_factor=2)
 
-    # -------- Build model and load weights --------
+    # -------- 构建模型并加载权重（与训练配置一致）--------
     model = MambaRegressor(Din=args.input_dim, K=args.seq_len,
                            proj_dim=args.proj_dim, d_model=args.d_model,
                            n_layer=args.n_layer, patch_len=args.patch_len,
                            stride=args.stride).to(device)
+
     state = ckpt["model"] if "model" in ckpt else ckpt
     model.load_state_dict(state, strict=False)
     model.eval()
 
-    # -------- Inference --------
+    # -------- 推理 --------
     Autocast = get_autocast(args.amp)
     y_true, y_pred = [], []
     with torch.no_grad():
-        pbar = tqdm(va, ncols=100, desc="eval")
-        for xb, yb in pbar:
+        pbar = tqdm(enumerate(va, 1), total=len(va), ncols=120, desc="eval")
+        for i, (xb, yb) in pbar:
             xb = xb.to(device, non_blocking=True)
             yb = yb.squeeze(1).to(device, non_blocking=True)
             with Autocast():
                 yhat = model(xb)
-            y_true.append(yb.cpu().numpy())
-            y_pred.append(yhat.cpu().numpy())
+
+            yt_np = yb.cpu().numpy()
+            yp_np = yhat.cpu().numpy()
+            y_true.append(yt_np)
+            y_pred.append(yp_np)
+
+            # ---- 每个 batch 的即时误差 ----
+            batch_err = np.sqrt(((yp_np - yt_np) ** 2).sum(axis=1))
+            mean_batch_err = batch_err.mean()
+            if i % 20 == 0 or i == 1:  # 每 20 个 batch 打印一次
+                print(f"[DBG] batch {i}/{len(va)} "
+                    f"mean_err={mean_batch_err:.3f} m "
+                    f"min={batch_err.min():.3f} m "
+                    f"max={batch_err.max():.3f} m")
+
     y_true = np.concatenate(y_true, axis=0)
     y_pred = np.concatenate(y_pred, axis=0)
     err = euclid_err(y_pred, y_true)
 
-    # -------- Stats --------
+    # -------- 统计 --------
     mean = float(err.mean())
     median = float(np.median(err))
     p80 = float(np.percentile(err, 80))
     p90 = float(np.percentile(err, 90))
     print(f"[STATS] N={len(err)}  mean={mean:.4f} m  median={median:.4f} m  P80={p80:.4f} m  P90={p90:.4f} m")
 
-    # -------- Plots --------
-    # CDF
-    e = np.sort(err)
-    y = np.arange(1, len(e)+1) / len(e)
+    # -------- 绘图 --------
     import matplotlib
     matplotlib.use("Agg")
+    # CDF
+    e = np.sort(err); y = np.arange(1, len(e)+1) / len(e)
     plt.figure(figsize=(5,4), dpi=160)
-    plt.plot(e, y)
-    plt.grid(True, linestyle="--", linewidth=0.5)
+    plt.plot(e, y); plt.grid(True, linestyle="--", linewidth=0.5)
     plt.xlabel("Position error (m)"); plt.ylabel("CDF"); plt.title("Error CDF")
     plt.tight_layout()
-    cdf_path = os.path.join(args.out_dir, "cdf.png")
-    plt.savefig(cdf_path); plt.close()
-
-    # Histogram
+    plt.savefig(os.path.join(args.out_dir, "cdf.png")); plt.close()
+    # 直方图
     plt.figure(figsize=(5,4), dpi=160)
-    plt.hist(err, bins=50)
-    plt.grid(True, linestyle="--", linewidth=0.5)
+    plt.hist(err, bins=50); plt.grid(True, linestyle="--", linewidth=0.5)
     plt.xlabel("Position error (m)"); plt.ylabel("Count"); plt.title("Error histogram")
     plt.tight_layout()
-    hist_path = os.path.join(args.out_dir, "err_hist.png")
-    plt.savefig(hist_path); plt.close()
+    plt.savefig(os.path.join(args.out_dir, "err_hist.png")); plt.close()
 
-    # -------- CSV / NPZ --------
-    np.savez(
-        os.path.join(args.out_dir, "val_preds.npz"),
-        y_true=y_true,
-        y_pred=y_pred,
-        err=err,
-        mean=np.float32(mean),
-        median=np.float32(median),
-        p80=np.float32(p80),
-        p90=np.float32(p90),
-)
+    # -------- 保存结果（标量分开存，避免 dict→np.savez 报错）--------
+    np.savez(os.path.join(args.out_dir, "val_preds.npz"),
+             y_true=y_true, y_pred=y_pred, err=err,
+             mean=np.float32(mean), median=np.float32(median),
+             p80=np.float32(p80), p90=np.float32(p90))
+
     if args.save_csv:
         import csv
-        csv_path = os.path.join(args.out_dir, "pred_vs_true.csv")
-        with open(csv_path, "w", newline="") as f:
+        with open(os.path.join(args.out_dir, "pred_vs_true.csv"), "w", newline="") as f:
             w = csv.writer(f)
             w.writerow(["y_true_x","y_true_y","y_pred_x","y_pred_y","err_m"])
             for (yt, yp, e_) in zip(y_true, y_pred, err):
                 w.writerow([yt[0], yt[1], yp[0], yp[1], e_])
 
     print(f"[OK] saved plots/stats under {args.out_dir}")
-    print(f" - CDF: {cdf_path}")
-    print(f" - Hist: {hist_path}")
 
 if __name__ == "__main__":
     main()
