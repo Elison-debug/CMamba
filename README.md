@@ -7,7 +7,6 @@ on the [LuViRA Dataset](https://github.com/ilaydayaman/LuViRA_Dataset).
 Our goal is to explore **lightweight Mamba-style architectures** for radio-based positioning,
 and compare them with CNN baselines (e.g. FCNN).
 
----
 
 ## 📂 Project Structure
 ```
@@ -19,7 +18,6 @@ and compare them with CNN baselines (e.g. FCNN).
 └── eval_out/ # Evaluation results (plots, csv, npz)/
 ```
 
----
 
 ## ⚙️ Setup
 
