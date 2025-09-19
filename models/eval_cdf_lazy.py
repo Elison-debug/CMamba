@@ -50,7 +50,7 @@ def main():
 
     # 实时统计参数
     ap.add_argument("--live_bins", type=int, default=100, help="在线直方图的分箱数")
-    ap.add_argument("--live_max_err", type=float, default=10.0, help="直方图覆盖的最大误差（m）")
+    ap.add_argument("--live_max_err", type=float, default=10.0, help="直方图覆盖的最大误差(m)")
     ap.add_argument("--live_every", type=int, default=1, help="每 N 个 batch 刷新一次进度条统计")
 
     args = ap.parse_args()
@@ -185,8 +185,27 @@ def main():
     # CDF
     e_sorted = np.sort(err)
     y = np.arange(1, len(e_sorted) + 1) / len(e_sorted)
+
+
+    # Zoom-in figure
     plt.figure(figsize=(5, 4), dpi=160)
     plt.plot(e_sorted, y)
+    plt.xlim(0, 0.5)   # 只显示 0~0.5 m
+    plt.xticks(np.arange(0, 0.51, 0.05))
+    plt.grid(True, linestyle="--", linewidth=0.5)
+    plt.xlabel("Position error (m)")
+    plt.ylabel("CDF")
+    plt.title("Error CDF (0-0.5 m zoom-in)")
+    plt.tight_layout()
+    plt.savefig(os.path.join(args.out_dir, "cdf_zoom.png"))
+    plt.close()
+    
+    plt.figure(figsize=(5, 4), dpi=160)
+    plt.plot(e_sorted, y)
+
+    xticks = list(np.arange(0, 0.51, 0.05)) + list(np.arange(1, 5.1, 0.5))
+    plt.xticks(xticks)
+
     plt.grid(True, linestyle="--", linewidth=0.5)
     plt.xlabel("Position error (m)"); plt.ylabel("CDF"); plt.title("Error CDF")
     plt.tight_layout()
