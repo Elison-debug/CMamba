@@ -26,7 +26,7 @@ def euclid_err(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--features_root", type=str, required=True)
+    ap.add_argument("--features_root", type=str, default="./data/features")
     # 会被 ckpt 覆盖（若存在），提供默认值即可
     ap.add_argument("--ckpt", type=str, required=True)
     # 新增：显式 eval 根目录；若不给则从 ckpt.meta 读取；再退化到 features_root/eval
@@ -89,7 +89,7 @@ def main():
 
     # 数据集：强制使用 train 统计
     stats_root = Path(meta.get("train_root", eval_root.parent)) # type: ignore
-    va_ds = FramesLazyDataset.from_filelist(val_files, seq_len=train_args.get("seq_len", 12), predict=train_args.get("predict", "next"), mmap=True, stats_root=stats_root)
+    va_ds = FramesLazyDataset.from_filelist(val_files, seq_len=train_args.get("seq_len", 12), predict=train_args.get("predict", "current"), mmap=True, stats_root=stats_root)
     va = DataLoader(va_ds, batch_size=args.batch_size, shuffle=False, num_workers=max(1, args.workers//2), pin_memory=True, persistent_workers=(args.workers>0), prefetch_factor=2)
 
 

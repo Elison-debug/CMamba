@@ -64,13 +64,26 @@ def make_cosine(total_steps: int,
         prog = step / max(1, total_steps)
         return min_lr + 0.5 * (target_lr - min_lr) * (1.0 + math.cos(math.pi * prog))
     return lr_at
+# constant then cosine decay
+def make_const_then_cosine(total_steps: int,
+                           target_lr: float,
+                           switch_ratio: float = 0.06,  # 前6%固定
+                           min_lr: float = 1e-6):
+    switch_step = int(total_steps * switch_ratio)
+
+    def lr_at(step: int) -> float:
+        if step < switch_step:
+            return target_lr
+        prog = (step - switch_step) / max(1, total_steps - switch_step)
+        return min_lr + 0.5 * (target_lr - min_lr) * (1.0 + math.cos(math.pi * prog))
+    return lr_at
 
 
 
 # ---------------------- Loss: Huber over Euclidean error ----------------------
 def epe_huber_loss(yp: torch.Tensor, yb: torch.Tensor, beta: float) -> Tuple[torch.Tensor, torch.Tensor]:
     """
-    欧氏距离误差的 Huber（SmoothL1）：
+    欧氏距离误差的 Huber(SmoothL1)：
         epe = ||yp - yb||_2
         per = SmoothL1(epe, 0, beta)   # reduction='none'
     返回 per (bs,) 逐样本损失
@@ -80,6 +93,33 @@ def epe_huber_loss(yp: torch.Tensor, yb: torch.Tensor, beta: float) -> Tuple[tor
     per = F.smooth_l1_loss(epe, torch.zeros_like(epe), beta=beta, reduction='none')  # (bs,)
     return per, epe
 
+_RUN_TARGETS = {}
+def _lock_target(out_dir: Path, subdir: str, base: str, suffix: str,
+                 patt: str, glob_pat: str, cache_key: str) -> Path:
+        """
+        锁定一次运行内的固定写入目标：
+        - 扫描 out_dir/subdir 下已有同类文件，取最大编号 n
+        - 本次运行固定写 base{n+1}{suffix}
+        - 结果缓存到 _RUN_TARGETS[cache_key]
+        """
+        if cache_key in _RUN_TARGETS:
+            return _RUN_TARGETS[cache_key]
+
+        d = out_dir / subdir
+        d.mkdir(parents=True, exist_ok=True)
+
+        rx = re.compile(patt)
+        maxn = 0
+        for f in d.glob(glob_pat):
+            m = rx.fullmatch(f.name)
+            if m:
+                n = int(m.group(1))
+                if n > maxn:
+                    maxn = n
+
+        target = d / f"{base}{maxn+1}{suffix}"
+        _RUN_TARGETS[cache_key] = target
+        return target
 
 def main():
     ap = argparse.ArgumentParser()
@@ -89,7 +129,7 @@ def main():
     ap.add_argument("--val_root",   type=str, default=None)
     ap.add_argument("--seq_len", type=int, required=True)
     ap.add_argument("--input_dim", type=int, required=True)
-    ap.add_argument("--predict", choices=["current", "next"], default="next")
+    ap.add_argument("--predict", choices=["current", "next"], default="current")
     ap.add_argument("--workers", type=int, default=4)
 
     # Model
@@ -108,7 +148,7 @@ def main():
     ap.add_argument("--beta", type=float, default=1.0, help="SmoothL1 (Huber) delta, meter")
 
     # Tail weighting (optional; default off)
-    ap.add_argument("--tail_tau", type=float, default=0.0, help=">0 启用尾部加权的起点阈值(m)，建议0.5")
+    ap.add_argument("--tail_tau", type=float, default=0.5, help=">0 启用尾部加权的起点阈值(m)，建议0.5")
     ap.add_argument("--tail_alpha", type=float, default=3.0)
     ap.add_argument("--tail_gamma", type=float, default=0.2)
 
@@ -179,9 +219,9 @@ def main():
 
     # LR schedule
     total_steps = max(1, args.epochs * len(tr))
-    #lr_fn = make_warmup_cosine(total_steps, args.lr)
-    lr_fn = make_constant(args.lr)
-    
+    # lr_fn = make_warmup_cosine(total_steps, args.lr)
+    # lr_fn = make_constant(args.lr)
+    lr_fn = make_const_then_cosine(total_steps,args.lr)
     def set_lr(lr: float):
         for g in opt.param_groups: g["lr"] = lr
 
@@ -248,6 +288,9 @@ def main():
                 else:
                     grad_norm = 0.0
                     cur_lr = opt.param_groups[0]["lr"]
+                
+                if ema is not None:
+                    ema.update(model.parameters())
             else:
                 grad_norm = 0.0
                 cur_lr = opt.param_groups[0]["lr"]
@@ -261,7 +304,7 @@ def main():
             avg_loss = tot_loss / max(1, seen)
             mean_epe = sum_err  / max(1, seen)
 
-            # 打印更有信息量的日志
+            # 打印日志
             grad_disp = f"{grad_norm:.3e}"
             pbar.set_postfix(
                 avg_loss=f"{avg_loss:.4f}",
@@ -271,30 +314,33 @@ def main():
             )
 
         return (tot_loss / max(1, seen)), (sum_err / max(1, seen))
-
-    # ------------- train / eval / save -------------
+    
     out_dir = Path(args.out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+    log_dir = out_dir / "log" ; log_dir.mkdir(parents=True, exist_ok=True)
+    result_dir = out_dir / "results";result_dir.mkdir(parents=True, exist_ok=True)
+    # ------------- train / eval / save -------------
+    # 运行期缓存：同一次运行内，同一个 base 只计算一次目标文件名
+    def next_log_path(out_dir: Path) -> Path:
+        p = _lock_target(out_dir, "log", "train_log", ".txt",
+                        r"train_log(\d+)\.txt", "train_log*.txt",
+                        cache_key="log:train_log")
+        return p
 
-    def next_ckpt_path(base: str) -> str:
-        p = out_dir / base
-        if not p.exists(): return str(p)
-        patt = re.compile(r"best(\d*)\.pt")
-        maxn = 1
-        for f in out_dir.glob("best*.pt"):
-            m = patt.fullmatch(f.name)
-            if m:
-                n = int(m.group(1) or "1"); maxn = max(maxn, n)
-        return str(out_dir / f"best{maxn+1}.pt")
-    def next_ckpt_epe_path(base: str) -> str:
-        p = out_dir / base
-        if not p.exists(): return str(p)
-        patt = re.compile(r"best(\d*)_epe\.pt")
-        maxn = 1
-        for f in out_dir.glob("best*.pt"):
-            m = patt.fullmatch(f.name)
-            if m:
-                n = int(m.group(1) or "1"); maxn = max(maxn, n)
-        return str(out_dir / f"best{maxn+1}.pt")
+    def next_ckpt_path(out_dir: Path) -> Path:
+        p = _lock_target(out_dir, "result", "best", ".pt",
+                        r"best(\d+)\.pt", "best*.pt",
+                        cache_key="result:best.pt")
+        return p
+
+    def next_ckpt_epe_path(out_dir: Path) -> Path:
+        p = _lock_target(out_dir, "result", "best", "_epe.pt",
+                        r"best(\d+)_epe\.pt", "best*_epe.pt",
+                        cache_key="result:best_epe.pt")
+        return p
+    out_dir = Path(args.out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+    log_path     = next_log_path(out_dir);log_path.mkdir(parents=True, exist_ok=True)
+    best_path    = next_ckpt_path(out_dir);best_path.mkdir(parents=True, exist_ok=True)
+    best_epe_path= next_ckpt_epe_path(out_dir);best_epe_path.mkdir(parents=True, exist_ok=True)
 
     best_loss = float("inf")
     best_epe  = float("inf")
@@ -311,11 +357,25 @@ def main():
 
         print(f"Epoch {ep:03d} | train {tr_loss:.4f} ({tr_epe:.3f} m) | "
               f"val {va_loss:.4f} ({va_epe:.3f} m) | lr {opt.param_groups[0]['lr']:.2e}")
+        
+        
+        with open(log_path, "a", encoding="utf-8") as f:
+            if ep == 1:  # 第一次运行，先写参数
+                f.write("===== Training Args =====\n")
+                for k, v in sorted(vars(args).items()):
+                    f.write(f"{k}: {v}\n")
+                f.write("=========================\n")
+
+            # 写 epoch 结果
+            msg = (f"Epoch {ep+1:03d} | "
+                f"train_loss={tr_loss:.4f} ({tr_epe:.3f} m)| "
+                f"val_loss={va_loss:.4f} ({va_epe:.3f} m)| "
+                f"lr={opt.param_groups[0]['lr']:.2e}\n")
+            f.write(msg)
 
         # 以 loss 选一份
         if va_loss < best_loss:
             best_loss = va_loss
-            path = next_ckpt_path("best.pt")
             state = {"model": model.state_dict(),
                      "args": vars(args),
                      "meta": {"train_files": [str(p) for p in tr_files],
@@ -323,15 +383,14 @@ def main():
                               "val_loss": float(va_loss),
                               "val_epe_m": float(va_epe)}}
             if ema is not None:
-                with ema.average_parameters(): torch.save(state, path)
+                with ema.average_parameters(): torch.save(state, best_path)
             else:
-                torch.save(state, path)
-            print(f"[OK] saved best.pt (val_loss={best_loss:.4f})")
+                torch.save(state, best_path)
+            print(f"[OK] saved {best_path} (val_loss={best_loss:.4f})")
 
         # 以 EPE 选主 best
         if va_epe < best_epe:
             best_epe = va_epe
-            path = next_ckpt_epe_path("best_epe.pt")
             state = {"model": model.state_dict(),
                      "args": vars(args),
                      "meta": {"train_files": [str(p) for p in tr_files],
@@ -339,10 +398,10 @@ def main():
                               "val_loss": float(va_loss),
                               "val_epe_m": float(va_epe)}}
             if ema is not None:
-                with ema.average_parameters(): torch.save(state, path)
+                with ema.average_parameters(): torch.save(state, best_epe_path)
             else:
-                torch.save(state, path)
-            print(f"[OK] saved best_epe.pt (val_epe={best_epe:.4f} m)")
+                torch.save(state, best_epe_path)
+            print(f"[OK] saved {best_epe_path} (val_epe={best_epe:.4f} m)")
 
 
 if __name__ == "__main__":
