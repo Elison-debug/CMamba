@@ -1,9 +1,14 @@
 @echo off
 set arg=%1
 set fold=%2
+if "%fold%" =="" (
+  set fold=0
+  echo Using default fold=0
+)
+
 
 if "%arg%"=="" (
-    echo Usage: train.bat be(blocked_embargo) ^| wf(eval_walk_forward)
+    echo Usage: train.bat be^(blocked_embargo^) ^| wf^(eval_walk_forward^
     goto :eof
 )
 
@@ -17,7 +22,7 @@ goto :eof
 echo Running eval_blocked_embargo...
 python -m eval_blocked_embargo ^
   --features_root=./data/features ^
-  --ckpt=ckpt_stream/best_fold0.pt ^
+  --ckpt=ckpt_stream/best_fold%fold%.pt ^
   --seq_len=64 --input_dim=2000 ^
   --block=500 --embargo=64
 goto :eof
