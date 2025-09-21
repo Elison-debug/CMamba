@@ -7,9 +7,9 @@ on the [LuViRA Dataset](https://github.com/ilaydayaman/LuViRA_Dataset).
 Our goal is to explore **lightweight Mamba-style architectures** for radio-based positioning,
 and compare them with CNN baselines (e.g. FCNN).
 
-
 ## 📂 Project Structure
-```
+
+```bash
 .
 ├── datasets/ # Lazy sliding-window dataset loader  /
 ├── models/ # CMamba regressor, training & evaluation scripts/
@@ -17,7 +17,6 @@ and compare them with CNN baselines (e.g. FCNN).
 ├── ckpt/ # Model checkpoints/
 └── eval_out/ # Evaluation results (plots, csv, npz)/
 ```
-
 
 ## ⚙️ Setup
 
@@ -28,7 +27,9 @@ pip install -r requirements.txt
 ```
 
 ## Installation
+
 To use this model, you need to have the following libraries installed:
+
 - `torch`
 - `einops`
 - `numpy`
@@ -46,16 +47,28 @@ pip install torch einops numpy pandas scikit-learn matplotlib wandb
 📊 Data Preparation
 
 Download the [LuViRA Dataset](https://github.com/ilaydayaman/LuViRA_Dataset)
- 
+
 Convert raw .mat/.csv into .npz feature files using the provided preprocessing scripts:
+
 ```bash
 python dataprocess/preprocess_luvira.py --input_root ./LuViRA --output_root ./data/features
 ```
+
+Or in Windows(CMD/PowerShell):
+
+```bash
+./data.bat grid/random
+```
+
 Each `-.npz` will contain:
+
 - `-feats`: time-series feature tensor
 - `-xy`: ground-truth positions
 
+Use args grid/random to process grid*/random*.mat files
+
 ## 🚀 Training
+
 ```bash
 python models/train_regression_lazy.py \
   --features_root ./data/features \
@@ -65,9 +78,13 @@ python models/train_regression_lazy.py \
   --batch_size 32 --epochs 60 \
   --lr 2e-3 --wd 0.05 --amp \
   --out_dir ./ckpt
+
 ```
+
 ## 📈 Evaluation
+
 After training, run:
+
 ```bash
 python -m models.eval_cdf_lazy \
   --features_root ./data/features \
@@ -75,7 +92,9 @@ python -m models.eval_cdf_lazy \
   --out_dir ./eval_out \
   --amp --save_csv
 ```
+
 This will produce:
+
 - `-cdf.png`: error CDF plot
 - `-err_hist.png`: histogram of position errors
 - `-val_preds.npz`: predictions + ground truth + errors

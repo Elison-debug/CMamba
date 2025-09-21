@@ -255,6 +255,7 @@ def main():
     ap.add_argument("--dtype", choices=["float16", "float32"], default="float16")
     ap.add_argument("--std_floor", type=float, default=1e-3)
     ap.add_argument("--split", type=float, default=0.8, help="train ratio (0-1)")
+    ap.add_argument("--eval_ratio", type=float, default=1, help="eval ratio (0-1) > train ratio")
 
     args = ap.parse_args()
 
@@ -313,6 +314,7 @@ def main():
     Din_ref: int = -1
 
     train_ratio = float(np.clip(args.split, 0.0, 1.0))
+    eval_ratio  = float(np.clip(args.eval_ratio, 0.0, 1.0))
 
     for base, mp, csv_match, T, F, A, L, kept_ratio in file_meta:
         Y, ts_radio = load_radio_mat(mp)
@@ -362,14 +364,16 @@ def main():
                 sum_vec += f64.sum(axis=0)
                 sumsq_vec += (f64 ** 2).sum(axis=0)
             count_total += f64.shape[0]
-
+        # split eval indices
+        e_split = max(1, int(round(L * eval_ratio)))
+        e_split = min(e_split, L - 1) if L >= 2 else 1  # 保证 eval 至少 1 帧（若 L==1 则全放 train）
         # --- eval part ---
-        if L - i_split > 0:
-            feats_ev, xy_ev, ts_ev = feats[i_split:], xy_use[i_split:], ts_use[i_split:]
+        if e_split - i_split > 0:
+            feats_ev, xy_ev, ts_ev = feats[i_split:e_split], xy_use[i_split:e_split], ts_use[i_split:e_split]
             meta_ev = dict(
                 taps=args.taps, input_dim=Din, scale=gscale,
                 align="index-fast", kept_ratio=float(kept_ratio), shape_TFA=[int(T), int(F), int(A)],
-                split=dict(role="eval", idx=[int(i_split), int(L)], total=int(L), ratio=float(1.0 - train_ratio))
+                split=dict(role="eval", idx=[int(i_split), int(e_split)], total=int(e_split), ratio=float(eval_ratio - train_ratio))
             )
             out_ev = os.path.join(eval_dir, f"{base}.npz")
             np.savez(out_ev,
@@ -379,7 +383,7 @@ def main():
                      meta=json.dumps(meta_ev))
             print(f"[OK][eval ] {out_ev} feats={feats_ev.shape}")
         else:
-            print(f"[WARN] {base}: no eval frames (L={L}, i_split={i_split})")
+            print(f"[WARN] {base}: no eval frames (L={L}, i_split={i_split},e_split={e_split})")
 
     if count_total == 0 or sum_vec is None or sumsq_vec is None:
         raise RuntimeError("No train frames to compute stats.")

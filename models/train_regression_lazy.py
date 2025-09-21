@@ -317,7 +317,7 @@ def main():
     
     out_dir = Path(args.out_dir); out_dir.mkdir(parents=True, exist_ok=True)
     log_dir = out_dir / "log" ; log_dir.mkdir(parents=True, exist_ok=True)
-    result_dir = out_dir / "results";result_dir.mkdir(parents=True, exist_ok=True)
+    result_dir = out_dir / "result";result_dir.mkdir(parents=True, exist_ok=True)
     # ------------- train / eval / save -------------
     # 运行期缓存：同一次运行内，同一个 base 只计算一次目标文件名
     def next_log_path(out_dir: Path) -> Path:
@@ -337,10 +337,9 @@ def main():
                         r"best(\d+)_epe\.pt", "best*_epe.pt",
                         cache_key="result:best_epe.pt")
         return p
-    out_dir = Path(args.out_dir); out_dir.mkdir(parents=True, exist_ok=True)
-    log_path     = next_log_path(out_dir);log_path.mkdir(parents=True, exist_ok=True)
-    best_path    = next_ckpt_path(out_dir);best_path.mkdir(parents=True, exist_ok=True)
-    best_epe_path= next_ckpt_epe_path(out_dir);best_epe_path.mkdir(parents=True, exist_ok=True)
+    log_path     = next_log_path(out_dir)
+    best_path    = next_ckpt_path(out_dir)
+    best_epe_path= next_ckpt_epe_path(out_dir)
 
     best_loss = float("inf")
     best_epe  = float("inf")
