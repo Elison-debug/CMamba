@@ -19,9 +19,9 @@ Preprocess LuViRA radio -> NPZ features (lazy frames)  [INDEX-FAST + train/eval 
 - out_dir/stats_train.npz
 
 NPZ 内容：
-- feats: (T', Din) float16/32（按 --dtype）
-- xy:    (T', 2) float32（米）
-- ts:    (T',)   float64（秒）
+- feats: (T', Din) float16/32(按 --dtype)
+- xy:    (T', 2) float32(米)
+- ts:    (T',)   float64(秒)
 - meta:  json 字符串，含 taps/input_dim/scale/align/kept_ratio/shape_TFA/split(索引范围等)
 """
 
@@ -204,13 +204,37 @@ def load_radio_mat(path: str) -> Tuple[np.ndarray, Optional[np.ndarray]]:
     return Y, ts
 
 # ----------------------- IFFT 提特征（沿频率轴） -----------------------
+# def cir_features_batch(Y: np.ndarray, L: int) -> np.ndarray:
+#     D = ifft(Y, axis=1)[:, :L, :]                                  # (T, L, A)
+#     p = np.sqrt(np.mean(np.abs(D) ** 2, axis=1, keepdims=True)) + 1e-8  # (T,1,A)
+#     Dn = D / p
+#     feat_cir = np.stack([Dn.real, Dn.imag], 2).transpose(0,1,3,2).reshape(T, L*A*2)
+#     power = np.log1p(np.mean(np.abs(D)**2, axis=1))      # (T, A)
+#     feats = np.stack([Dn.real, Dn.imag], axis=2)                    # (T, L, 2, A)
+#     feats = feats.transpose(0, 1, 3, 2).reshape(D.shape[0], L * D.shape[2] * 2).astype(np.float32)
+#     return feats
+
 def cir_features_batch(Y: np.ndarray, L: int) -> np.ndarray:
-    D = ifft(Y, axis=1)[:, :L, :]                                  # (T, L, A)
-    p = np.sqrt(np.mean(np.abs(D) ** 2, axis=1, keepdims=True)) + 1e-8  # (T,1,A)
+    # Y: (T, F, A)  取前 L 个 CIR taps
+    D = ifft(Y, axis=1)[:, :L, :]                        # (T, L, A)
+
+    # 每根天线一个常数尺度（跨时+tap），避免把时间上的幅度信息抹掉
+    p = np.sqrt(np.mean(np.abs(D)**2, axis=(0, 1), keepdims=True)) + 1e-8  # (1,1,A)
     Dn = D / p
-    feats = np.stack([Dn.real, Dn.imag], axis=2)                    # (T, L, 2, A)
-    feats = feats.transpose(0, 1, 3, 2).reshape(D.shape[0], L * D.shape[2] * 2).astype(np.float32)
+
+    T, _, A = Dn.shape
+
+    # 基础特征：实部/虚部展开 -> (T, 2*L*A)
+    feat_cir = np.stack([Dn.real, Dn.imag], axis=2)      # (T, L, 2, A)
+    feat_cir = feat_cir.transpose(0, 1, 3, 2).reshape(T, L * A * 2)
+
+    # 追加功率通道（每时刻、每天线）：(T, A)
+    power = np.log1p(np.mean(np.abs(D)**2, axis=1))      # (T, A)
+
+    # 拼接得到最终特征：(T, 2*L*A + A)
+    feats = np.concatenate([feat_cir.astype(np.float32), power.astype(np.float32)], axis=1)
     return feats
+
 
 # ----------------------- 文件名匹配 -----------------------
 
@@ -258,6 +282,11 @@ def main():
     ap.add_argument("--eval_ratio", type=float, default=1, help="eval ratio (0-1) > train ratio")
 
     args = ap.parse_args()
+
+    train_ratio = float(np.clip(args.split, 0.0, 1.0))
+    eval_ratio  = float(np.clip(args.eval_ratio, 0.0, 1.0))
+    if not (0.0 < train_ratio < 1.0) or not (train_ratio < eval_ratio <= 1.0):
+        raise ValueError("--split must be in (0,1) and --eval_ratio in (split,1].")
 
     # 子目录
     train_dir = os.path.join(args.out_dir, "train")
@@ -365,25 +394,29 @@ def main():
                 sumsq_vec += (f64 ** 2).sum(axis=0)
             count_total += f64.shape[0]
         # split eval indices
-        e_split = max(1, int(round(L * eval_ratio)))
-        e_split = min(e_split, L - 1) if L >= 2 else 1  # 保证 eval 至少 1 帧（若 L==1 则全放 train）
+        e_split = min(int(round(L * eval_ratio)), L)
+        if e_split <= i_split:
+            e_split = L
         # --- eval part ---
-        if e_split - i_split > 0:
-            feats_ev, xy_ev, ts_ev = feats[i_split:e_split], xy_use[i_split:e_split], ts_use[i_split:e_split]
-            meta_ev = dict(
-                taps=args.taps, input_dim=Din, scale=gscale,
-                align="index-fast", kept_ratio=float(kept_ratio), shape_TFA=[int(T), int(F), int(A)],
-                split=dict(role="eval", idx=[int(i_split), int(e_split)], total=int(e_split), ratio=float(eval_ratio - train_ratio))
+        feats_ev, xy_ev, ts_ev = feats[i_split:e_split], xy_use[i_split:e_split], ts_use[i_split:e_split]
+        meta_ev = dict(
+            taps=args.taps, input_dim=Din, scale=gscale,
+            align="index-fast", kept_ratio=float(kept_ratio), shape_TFA=[int(T), int(F), int(A)],
+            split=dict(
+                role="eval",
+                idx=[int(i_split), int(e_split)],   # [start, end)
+                total=int(L),
+                ratio=float(e_split - i_split) / float(L),
+                exclusive_end=True
+                )
             )
-            out_ev = os.path.join(eval_dir, f"{base}.npz")
-            np.savez(out_ev,
-                     feats=feats_ev.astype(args.dtype),
-                     xy=xy_ev.astype(np.float32),
-                     ts=ts_ev.astype(np.float64),
-                     meta=json.dumps(meta_ev))
-            print(f"[OK][eval ] {out_ev} feats={feats_ev.shape}")
-        else:
-            print(f"[WARN] {base}: no eval frames (L={L}, i_split={i_split},e_split={e_split})")
+        out_ev = os.path.join(eval_dir, f"{base}.npz")
+        np.savez(out_ev,
+                    feats=feats_ev.astype(args.dtype),
+                    xy=xy_ev.astype(np.float32),
+                    ts=ts_ev.astype(np.float64),
+                    meta=json.dumps(meta_ev))
+        print(f"[OK][eval ] {out_ev} feats={feats_ev.shape}")
 
     if count_total == 0 or sum_vec is None or sumsq_vec is None:
         raise RuntimeError("No train frames to compute stats.")

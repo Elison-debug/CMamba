@@ -16,7 +16,7 @@ goto :eof
 echo Running grid...
 python -m models.train_regression_lazy ^
     --features_root=./data/features/grid ^
-    --seq_len=12 --input_dim=2000 ^
+    --seq_len=12 --input_dim=2100 ^
     --proj_dim=64 --d_model=128 ^
     --n_layer=4 --patch_len=8 ^
     --stride=4 --batch_size=32 ^

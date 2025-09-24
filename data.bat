@@ -20,7 +20,7 @@ python -m datasets.preprocess_luvira_lazy ^
   --out_dir=./data/features/grid   ^
   --taps=10 --fps=100 ^
   --pos_units=mm --dtype=float16 ^
-  --split=0.2 --eval_ratio=0.5
+  --split=0.8 --eval_ratio=1
 goto :eof
 
 :run2

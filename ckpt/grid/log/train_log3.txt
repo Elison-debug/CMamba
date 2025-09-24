@@ -1,0 +1,46 @@
+===== Training Args =====
+accum: 4
+amp: True
+batch_size: 32
+beta: 1.0
+d_model: 128
+epochs: 20
+features_root: ./data/features/grid
+input_dim: 2100
+lr: 0.0003
+n_layer: 4
+out_dir: ./ckpt/grid
+patch_len: 8
+predict: current
+proj_dim: 64
+seed: 1234
+seq_len: 12
+stride: 4
+tail_alpha: 3.0
+tail_gamma: 0.2
+tail_tau: 0.5
+train_root: data\features\grid\train
+val_root: data\features\grid\eval
+wd: 0.01
+workers: 4
+=========================
+Epoch 002 | train_loss=0.0509 (0.123 m)| val_loss=0.0783 (0.166 m)| lr=3.00e-04
+Epoch 003 | train_loss=0.0020 (0.047 m)| val_loss=0.0747 (0.153 m)| lr=3.00e-04
+Epoch 004 | train_loss=0.0015 (0.040 m)| val_loss=0.0709 (0.146 m)| lr=3.00e-04
+Epoch 005 | train_loss=0.0011 (0.035 m)| val_loss=0.0707 (0.144 m)| lr=3.00e-04
+Epoch 006 | train_loss=0.0008 (0.031 m)| val_loss=0.0697 (0.142 m)| lr=3.00e-04
+Epoch 007 | train_loss=0.0007 (0.028 m)| val_loss=0.0677 (0.139 m)| lr=3.00e-04
+Epoch 008 | train_loss=0.0006 (0.026 m)| val_loss=0.0681 (0.137 m)| lr=2.99e-04
+Epoch 009 | train_loss=0.0005 (0.025 m)| val_loss=0.0688 (0.137 m)| lr=2.99e-04
+Epoch 010 | train_loss=0.0005 (0.023 m)| val_loss=0.0669 (0.135 m)| lr=2.98e-04
+Epoch 011 | train_loss=0.0004 (0.021 m)| val_loss=0.0645 (0.134 m)| lr=2.96e-04
+Epoch 012 | train_loss=0.0003 (0.020 m)| val_loss=0.0661 (0.133 m)| lr=2.95e-04
+Epoch 013 | train_loss=0.0003 (0.019 m)| val_loss=0.0660 (0.133 m)| lr=2.93e-04
+Epoch 014 | train_loss=0.0003 (0.018 m)| val_loss=0.0665 (0.132 m)| lr=2.91e-04
+Epoch 015 | train_loss=0.0003 (0.017 m)| val_loss=0.0658 (0.132 m)| lr=2.89e-04
+Epoch 016 | train_loss=0.0002 (0.016 m)| val_loss=0.0662 (0.131 m)| lr=2.87e-04
+Epoch 017 | train_loss=0.0002 (0.016 m)| val_loss=0.0667 (0.131 m)| lr=2.84e-04
+Epoch 018 | train_loss=0.0002 (0.015 m)| val_loss=0.0664 (0.130 m)| lr=2.81e-04
+Epoch 019 | train_loss=0.0002 (0.015 m)| val_loss=0.0647 (0.130 m)| lr=2.78e-04
+Epoch 020 | train_loss=0.0002 (0.014 m)| val_loss=0.0631 (0.129 m)| lr=2.74e-04
+Epoch 021 | train_loss=0.0002 (0.013 m)| val_loss=0.0651 (0.129 m)| lr=2.71e-04
