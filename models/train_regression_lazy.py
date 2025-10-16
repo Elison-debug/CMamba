@@ -70,8 +70,10 @@ def make_const_then_cosine(total_steps: int,
                            switch_ratio: float = 0.06,  # 前6%固定
                            min_lr: float = 1e-6):
     switch_step = int(total_steps * switch_ratio)
+    
 
     def lr_at(step: int) -> float:
+        #print(f"[INFO] LR schedule: const {switch_step} steps, total_steps={total_steps},now step={step}")
         if step < switch_step:
             return target_lr
         prog = (step - switch_step) / max(1, total_steps - switch_step)
@@ -138,6 +140,7 @@ def main():
     ap.add_argument("--n_layer", type=int, default=4)
     ap.add_argument("--patch_len", type=int, default=8)
     ap.add_argument("--stride", type=int, default=4)
+    ap.add_argument("--sigma", type=float, default=0.5)
 
     # Train
     ap.add_argument("--epochs", type=int, default=60)
@@ -196,7 +199,7 @@ def main():
     # ---------- model ----------
     model = MambaRegressor(
         Din=args.input_dim, K=args.seq_len,
-        proj_dim=args.proj_dim, d_model=args.d_model,
+        proj_dim=args.proj_dim, d_model=args.d_model,sigma=args.sigma,
         n_layer=args.n_layer, patch_len=args.patch_len, stride=args.stride
     ).to(device)
 
@@ -218,7 +221,7 @@ def main():
         ema = None
 
     # LR schedule
-    total_steps = max(1, args.epochs * len(tr))
+    total_steps = max(1, (args.epochs * len(tr)/ args.accum))
     # lr_fn = make_warmup_cosine(total_steps, args.lr)
     # lr_fn = make_constant(args.lr)
     lr_fn = make_const_then_cosine(total_steps,args.lr)
@@ -270,6 +273,7 @@ def main():
 
             # 反向/step（只在累积边界）
             did_step = False
+            grad_norm = 0.0
             if train:
                 if use_amp: scaler.scale(loss).backward()
                 else:       loss.backward()
@@ -286,13 +290,13 @@ def main():
                     cur_lr = sched.step()
                     did_step = True
                 else:
-                    grad_norm = 0.0
+                    #grad_norm = 0.0
                     cur_lr = opt.param_groups[0]["lr"]
                 
                 if ema is not None:
                     ema.update(model.parameters())
             else:
-                grad_norm = 0.0
+                #grad_norm = 0.0
                 cur_lr = opt.param_groups[0]["lr"]
 
             # 运行统计（严格样本口径）
@@ -307,9 +311,9 @@ def main():
             # 打印日志
             grad_disp = f"{grad_norm:.3e}"
             pbar.set_postfix(
-                avg_loss=f"{avg_loss:.4f}",
-                mean_pos_err_m=f"{mean_epe:.3f}",
-                lr=f"{cur_lr:.2e}",
+                avg_loss=f"{avg_loss:.6f}",
+                mean_pos_err_m=f"{mean_epe:.5f}",
+                lr=f"{cur_lr:.3e}",
                 grad=grad_disp,
             )
 

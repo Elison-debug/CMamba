@@ -44,6 +44,7 @@ def main():
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--seed", type=int, default=1234)
     ap.add_argument("--out_dir", type=str, default="./eval_out")
+    ap.add_argument("--sigma", type=float, default=0.5)
     ap.add_argument("--amp", action="store_true", help="enable autocast for eval")
     ap.add_argument("--save_csv", action="store_true")
 
@@ -96,7 +97,7 @@ def main():
     # -------- 模型 --------
     model = MambaRegressor(
         Din=args.input_dim, K=args.seq_len,
-        proj_dim=args.proj_dim, d_model=args.d_model,
+        proj_dim=args.proj_dim, d_model=args.d_model,sigma=args.sigma,
         n_layer=args.n_layer, patch_len=args.patch_len, stride=args.stride
     ).to(device)
     state = ckpt["model"] if "model" in ckpt else ckpt
@@ -205,7 +206,7 @@ def main():
     plt.figure(figsize=(5, 4), dpi=160)
     plt.plot(e_sorted, y)
 
-    xticks = list(np.arange(0, 0.51, 0.05)) + list(np.arange(1, 5.1, 0.5))
+    xticks = list(np.arange(0, 0.41, 0.10)) + list(np.arange(0, 2.1, 0.2))
     plt.xticks(xticks)
 
     plt.grid(True, linestyle="--", linewidth=0.5)
@@ -240,11 +241,11 @@ def main():
     md = []
     md.append("| Metric | Value (m) |")
     md.append("|--------|-----------|")
-    md.append(f"| Mean   | {mean:.3f} |")
-    md.append(f"| Median | {median:.3f} |")
-    md.append(f"| P80    | {p80:.3f} |")
-    md.append(f"| P90    | {p90:.3f} |")
-    md.append(f"| Max    | {err.max():.3f} |")
+    md.append(f"| Mean   | {mean:.4f} |")
+    md.append(f"| Median | {median:.4f} |")
+    md.append(f"| P80    | {p80:.4f} |")
+    md.append(f"| P90    | {p90:.4f} |")
+    md.append(f"| Max    | {err.max():.4f} |")
     table = "\n".join(md)
     print("\n[SUMMARY]\n" + table + "\n")
 

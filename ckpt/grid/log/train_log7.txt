@@ -1,0 +1,37 @@
+===== Training Args =====
+accum: 4
+amp: True
+batch_size: 32
+beta: 1.0
+d_model: 128
+epochs: 20
+features_root: ./data/features/grid
+input_dim: 2100
+lr: 0.0003
+n_layer: 4
+out_dir: ./ckpt/grid
+patch_len: 8
+predict: current
+proj_dim: 64
+seed: 1234
+seq_len: 12
+sigma: 0.0
+stride: 4
+tail_alpha: 3.0
+tail_gamma: 0.2
+tail_tau: 0.5
+train_root: data\features\grid\train
+val_root: data\features\grid\eval
+wd: 0.01
+workers: 4
+=========================
+Epoch 002 | train_loss=0.0509 (0.123 m)| val_loss=0.0783 (0.166 m)| lr=3.00e-04
+Epoch 003 | train_loss=0.0020 (0.047 m)| val_loss=0.0749 (0.154 m)| lr=2.99e-04
+Epoch 004 | train_loss=0.0015 (0.040 m)| val_loss=0.0705 (0.147 m)| lr=2.93e-04
+Epoch 005 | train_loss=0.0011 (0.035 m)| val_loss=0.0713 (0.144 m)| lr=2.84e-04
+Epoch 006 | train_loss=0.0007 (0.029 m)| val_loss=0.0700 (0.142 m)| lr=2.71e-04
+Epoch 007 | train_loss=0.0006 (0.026 m)| val_loss=0.0694 (0.141 m)| lr=2.54e-04
+Epoch 008 | train_loss=0.0005 (0.023 m)| val_loss=0.0695 (0.139 m)| lr=2.35e-04
+Epoch 009 | train_loss=0.0004 (0.021 m)| val_loss=0.0693 (0.138 m)| lr=2.13e-04
+Epoch 010 | train_loss=0.0003 (0.018 m)| val_loss=0.0673 (0.137 m)| lr=1.90e-04
+Epoch 011 | train_loss=0.0002 (0.015 m)| val_loss=0.0670 (0.136 m)| lr=1.65e-04

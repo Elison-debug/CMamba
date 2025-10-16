@@ -30,6 +30,7 @@ class MambaRegressor(nn.Module):
                  d_model:int=128,   # CMamba hidden width
                  n_layer:int=4,     # CMamba depth
                  patch_len:int=8,
+                 sigma:float=1.0,
                  stride:int=4):
         super().__init__()
         self.Din = Din
@@ -46,7 +47,7 @@ class MambaRegressor(nn.Module):
             stride=stride,
             forecast_len=1,         # we only need one step
             pad_multiple=1,         # ← 加上这行，避免 1 被 pad 成 8
-            sigma=0.0,
+            sigma=sigma,
             # keep other defaults from ModelArgs
         )
         self.backbone = CMamba(args)

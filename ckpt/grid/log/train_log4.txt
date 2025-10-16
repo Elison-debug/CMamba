@@ -1,0 +1,32 @@
+===== Training Args =====
+accum: 4
+amp: True
+batch_size: 32
+beta: 1.0
+d_model: 128
+epochs: 20
+features_root: ./data/features/grid
+input_dim: 2100
+lr: 0.0003
+n_layer: 4
+out_dir: ./ckpt/grid
+patch_len: 8
+predict: current
+proj_dim: 64
+seed: 1234
+seq_len: 12
+sigma: 1.0 
+stride: 4
+tail_alpha: 3.0
+tail_gamma: 0.2
+tail_tau: 0.5
+train_root: data\features\grid\train
+val_root: data\features\grid\eval
+wd: 0.01
+workers: 4
+=========================
+Epoch 002 | train_loss=0.2276 (0.322 m)| val_loss=0.1075 (0.241 m)| lr=3.00e-04
+Epoch 003 | train_loss=0.0758 (0.216 m)| val_loss=0.1116 (0.242 m)| lr=2.99e-04
+Epoch 004 | train_loss=0.0558 (0.187 m)| val_loss=0.1241 (0.255 m)| lr=2.93e-04
+Epoch 005 | train_loss=0.0434 (0.167 m)| val_loss=0.1428 (0.262 m)| lr=2.84e-04
+Epoch 006 | train_loss=0.0342 (0.150 m)| val_loss=0.1423 (0.260 m)| lr=2.71e-04
