@@ -6,8 +6,9 @@ if "%arg%"=="" (
     goto :eof
 )
 
-if "%arg%"=="grid" goto run1
+if "%arg%"=="grid"   goto run1
 if "%arg%"=="random" goto run2
+if "%arg%"=="parity" goto run3
 
 echo Unknown argument: %arg%
 goto :eof
@@ -20,7 +21,7 @@ python -m models.train_regression_lazy ^
     --proj_dim=64 --d_model=128 ^
     --n_layer=4 --patch_len=8 ^
     --stride=4 --batch_size=32 ^
-    --epochs=20 --lr=3e-4 --sigma=0 ^
+    --epochs=20 --lr=3e-4 --sigma=0.15 ^
     --wd=0.01 --out_dir=./ckpt/grid ^
     --amp --accum=4
 goto :eof
@@ -35,5 +36,18 @@ python -m models.train_regression_lazy ^
     --stride=4 --batch_size=32 ^
     --epochs=60 --lr=3e-4 --sigma=0.1^
     --wd=0.01 --out_dir=./ckpt/random ^
+    --amp --accum=4
+goto :eof
+
+:run3
+echo Running parity grid...
+python -m models.train_regression_lazy ^
+    --features_root=./data/features/parity ^
+    --seq_len=12 --input_dim=2100 ^
+    --proj_dim=64 --d_model=128 ^
+    --n_layer=4 --patch_len=8 ^
+    --stride=4 --batch_size=32 ^
+    --epochs=20 --lr=3e-4 --sigma=0.15 ^
+    --wd=0.01 --out_dir=./ckpt/parity ^
     --amp --accum=4
 goto :eof

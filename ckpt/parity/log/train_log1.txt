@@ -1,0 +1,46 @@
+===== Training Args =====
+accum: 4
+amp: True
+batch_size: 32
+beta: 1.0
+d_model: 128
+epochs: 20
+features_root: ./data/features/parity
+input_dim: 2100
+lr: 0.0003
+n_layer: 4
+out_dir: ./ckpt/parity
+patch_len: 8
+predict: current
+proj_dim: 64
+seed: 1234
+seq_len: 12
+sigma: 0.15
+stride: 4
+tail_alpha: 3.0
+tail_gamma: 0.2
+tail_tau: 0.5
+train_root: data\features\parity\train
+val_root: data\features\parity\eval
+wd: 0.01
+workers: 4
+=========================
+Epoch 002 | train_loss=0.0893 (0.163 m)| val_loss=0.0687 (0.184 m)| lr=3.00e-04
+Epoch 003 | train_loss=0.0041 (0.066 m)| val_loss=0.0625 (0.171 m)| lr=2.99e-04
+Epoch 004 | train_loss=0.0026 (0.054 m)| val_loss=0.0593 (0.165 m)| lr=2.93e-04
+Epoch 005 | train_loss=0.0021 (0.048 m)| val_loss=0.0571 (0.162 m)| lr=2.84e-04
+Epoch 006 | train_loss=0.0017 (0.043 m)| val_loss=0.0557 (0.158 m)| lr=2.71e-04
+Epoch 007 | train_loss=0.0014 (0.040 m)| val_loss=0.0561 (0.157 m)| lr=2.54e-04
+Epoch 008 | train_loss=0.0012 (0.037 m)| val_loss=0.0570 (0.156 m)| lr=2.35e-04
+Epoch 009 | train_loss=0.0010 (0.034 m)| val_loss=0.0556 (0.154 m)| lr=2.13e-04
+Epoch 010 | train_loss=0.0009 (0.031 m)| val_loss=0.0551 (0.153 m)| lr=1.90e-04
+Epoch 011 | train_loss=0.0007 (0.029 m)| val_loss=0.0560 (0.153 m)| lr=1.66e-04
+Epoch 012 | train_loss=0.0006 (0.027 m)| val_loss=0.0583 (0.154 m)| lr=1.41e-04
+Epoch 013 | train_loss=0.0005 (0.025 m)| val_loss=0.0579 (0.153 m)| lr=1.16e-04
+Epoch 014 | train_loss=0.0005 (0.023 m)| val_loss=0.0585 (0.153 m)| lr=9.22e-05
+Epoch 015 | train_loss=0.0004 (0.022 m)| val_loss=0.0596 (0.153 m)| lr=7.01e-05
+Epoch 016 | train_loss=0.0004 (0.020 m)| val_loss=0.0604 (0.154 m)| lr=5.03e-05
+Epoch 017 | train_loss=0.0003 (0.019 m)| val_loss=0.0614 (0.154 m)| lr=3.32e-05
+Epoch 018 | train_loss=0.0003 (0.018 m)| val_loss=0.0623 (0.155 m)| lr=1.94e-05
+Epoch 019 | train_loss=0.0003 (0.017 m)| val_loss=0.0623 (0.155 m)| lr=9.30e-06
+Epoch 020 | train_loss=0.0002 (0.017 m)| val_loss=0.0624 (0.155 m)| lr=3.10e-06

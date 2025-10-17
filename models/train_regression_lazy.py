@@ -6,14 +6,93 @@ import argparse, math, re
 from pathlib import Path
 from typing import Tuple
 
+import random as pyrandom
+import numpy as np
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from typing import Union
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-
+from torch.cuda.amp import GradScaler
 from datasets.frames_lazy import FramesLazyDataset
 from models.mamba_regressor import MambaRegressor
+from typing import Any, Dict
+
+def seed_everything(seed: int):
+    pyrandom.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+def dataloader_worker_init_fn(worker_id: int):
+    worker_seed = torch.initial_seed() % (2**32)
+    # 让 Python/NumPy 与 PyTorch 的 worker 种子对齐
+    pyrandom.seed(worker_seed); np.random.seed(worker_seed); torch.manual_seed(worker_seed)
+    #print(f"[Worker {worker_id}] worker_seed={worker_seed}")   
+
+def save_checkpoint(path, epoch, global_step, model, optimizer, scaler, ema, scheduler=None, extra: dict | None=None):
+    ckpt = {
+        "epoch": int(epoch),                 # 当前完成到的 epoch 号（建议1-based或0-based保持一致）
+        "global_step": int(global_step),     # 已完成的优化步数（便于还原scheduler）
+        "model": model.state_dict(),
+        "optimizer": optimizer.state_dict() if optimizer is not None else None,
+        "scaler": (scaler.state_dict() if hasattr(scaler, "state_dict") else None),
+        "ema": ema.state_dict() if ema is not None else None,
+        "scheduler": scheduler.state_dict() if scheduler is not None and hasattr(scheduler, "state_dict") else None,
+        "extra": extra or {},               # 可放 best_metric、随机种子等
+    }
+    torch.save(ckpt, path)
+    print(f"[CKPT] saved -> {path}")
+
+def load_checkpoint(path, model,
+                    device: Union[str, torch.device] = "cuda",
+                    optimizer=None, scaler=None, ema=None,
+                    scheduler=None, strict=False):
+    print(f"[CKPT] loading from {path}")
+    ckpt = torch.load(path, map_location=device)
+
+    # 1) 模型
+    missing, unexpected = model.load_state_dict(ckpt["model"], strict=strict)
+    if (missing or unexpected) and strict:
+        raise RuntimeError(f"Strict load failed. Missing={missing}, Unexpected={unexpected}")
+    elif missing or unexpected:
+        print(f"[CKPT][warn] model missing={missing}, unexpected={unexpected}")
+
+    # 2) 优化器 / scaler / ema / scheduler
+    if optimizer is not None and ckpt.get("optimizer") is not None:
+        optimizer.load_state_dict(ckpt["optimizer"])
+    if scaler is not None and ckpt.get("scaler") is not None:
+        try:
+            scaler.load_state_dict(ckpt["scaler"])
+        except Exception as e:
+            print(f"[CKPT][warn] scaler load failed: {e}")
+    if ema is not None and ckpt.get("ema") is not None:
+        try:
+            ema.load_state_dict(ckpt["ema"])
+        except Exception as e:
+            print(f"[CKPT][warn] ema load failed: {e}")
+    if scheduler is not None and ckpt.get("scheduler") is not None:
+        try:
+            scheduler.load_state_dict(ckpt["scheduler"])
+        except Exception as e:
+            print(f"[CKPT][warn] scheduler load failed: {e}")
+
+    epoch = int(ckpt.get("epoch", 0))
+    global_step = int(ckpt.get("global_step", 0))
+    extra = ckpt.get("extra", {})
+    if "rng" in extra:
+        torch.set_rng_state(extra["rng"]["torch"])
+        if torch.cuda.is_available() and extra["rng"]["cuda"] is not None:
+            torch.cuda.set_rng_state_all(extra["rng"]["cuda"])
+        np.random.set_state(extra["rng"]["numpy"])
+        pyrandom.setstate(extra["rng"]["random"])
+
+    print(f"[CKPT] loaded epoch={epoch}, global_step={global_step}")
+    return epoch, global_step, extra
+
 
 
 # ---------------------- AMP utilities ----------------------
@@ -151,7 +230,7 @@ def main():
     ap.add_argument("--beta", type=float, default=1.0, help="SmoothL1 (Huber) delta, meter")
 
     # Tail weighting (optional; default off)
-    ap.add_argument("--tail_tau", type=float, default=0.5, help=">0 启用尾部加权的起点阈值(m)，建议0.5")
+    ap.add_argument("--tail_tau", type=float, default=0.0, help=">0 启用尾部加权的起点阈值(m)，建议0.5")
     ap.add_argument("--tail_alpha", type=float, default=3.0)
     ap.add_argument("--tail_gamma", type=float, default=0.2)
 
@@ -159,15 +238,26 @@ def main():
     ap.add_argument("--amp", action="store_true")
     ap.add_argument("--seed", type=int, default=1234)
     ap.add_argument("--out_dir", type=str, default="./ckpt")
+
+    # Resume / eval
+    ap.add_argument("--resume", type=str, default="", help="Path to checkpoint (.pt) to resume from")
+    ap.add_argument("--resume_strict", action="store_true", help="Strictly match keys when loading model")
+    ap.add_argument("--load_ema_for_eval", action="store_true", help="Use EMA weights for evaluation / export") 
+    
     #args = ap.parse_args()
-    args, _ = ap.parse_known_args()
+    #args, _ = ap.parse_known_args()
+    args = ap.parse_args()
+
     # Repro
-    torch.manual_seed(args.seed)
+    seed_everything(args.seed)
+
     if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(args.seed)
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
         torch.backends.cudnn.benchmark = True
+
+    if hasattr(torch, "set_float32_matmul_precision"):
+        torch.set_float32_matmul_precision("medium")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -189,10 +279,44 @@ def main():
     stats_root = tr_dir.parent  # 强制使用 train 统计
     tr_ds = FramesLazyDataset.from_filelist(tr_files, seq_len=args.seq_len, predict=args.predict, mmap=True, stats_root=stats_root)
     va_ds = FramesLazyDataset.from_filelist(va_files, seq_len=args.seq_len, predict=args.predict, mmap=True, stats_root=stats_root)
+    
+    # DataLoader with random seed workers
+    # def _wif(worker_id):
+    #     s = args.seed + worker_id
+    #     pyrandom.seed(s); np.random.seed(s); torch.manual_seed(s)
 
-    tr = DataLoader(tr_ds, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=True, drop_last=True, persistent_workers=(args.workers>0), prefetch_factor=2)
-    va = DataLoader(va_ds, batch_size=args.batch_size, shuffle=False, num_workers=max(1, args.workers//2), pin_memory=True, drop_last=False, persistent_workers=(args.workers>0), prefetch_factor=2)
+    # Windows 上 persistent_workers 常见兼容性问题，建议先关闭
+    # use_persist = (args.workers > 0 and False)
+    # tr = DataLoader(tr_ds, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=True, drop_last=True, persistent_workers=use_persist, prefetch_factor=2, worker_init_fn=_wif)
+    # va = DataLoader(va_ds, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True, drop_last=False, persistent_workers=use_persist, prefetch_factor=4,pin_memory_device="cuda", worker_init_fn=_wif )
+    def build_loader(dataset, *, batch_size, shuffle, workers, drop_last, pin_memory=True ,prefetch_factor):
+        # 只用关键字参数，避免任何位置错位
+        kwargs = dict[str, Any] (
+            dataset=dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            num_workers=workers,
+            drop_last=drop_last,
+            pin_memory=(pin_memory and torch.cuda.is_available()),
+        )
 
+        if workers and workers > 0:
+            # 仅在多进程时才加这些参数（老版本更兼容）
+            kwargs["worker_init_fn"] = dataloader_worker_init_fn
+            # prefetch_factor 只有 num_workers>0 才有效；传 2~4 即可
+            kwargs["prefetch_factor"] = prefetch_factor
+            # 某些环境 persistent_workers 不稳定；先给 False，稳定后再开
+            kwargs["persistent_workers"] = True
+
+        # 不要传 sampler/batch_sampler（你若自己采样，就别传 shuffle）
+        return torch.utils.data.DataLoader(**kwargs)
+
+    tr = build_loader(tr_ds, batch_size=args.batch_size, shuffle=True,
+                  workers=args.workers, drop_last=True,  pin_memory=True , prefetch_factor=2)
+
+    va = build_loader(va_ds, batch_size=args.batch_size, shuffle=False,
+                    workers=args.workers, drop_last=False, pin_memory=True , prefetch_factor=4)
+    
     print(f"[SPLIT] train files={len(tr_files)}  val files={len(va_files)}")
     print(f"[INFO]  train samples={len(tr_ds)} | val samples={len(va_ds)}")
 
@@ -204,14 +328,30 @@ def main():
     ).to(device)
 
     # Optimizer: no wd on norm/bias
-    decay, no_decay = [], []
-    for n, p in model.named_parameters():
-        (no_decay if (n.endswith("bias") or "norm" in n.lower()) else decay).append(p)
-    opt = torch.optim.AdamW(
-        [{"params": decay, "weight_decay": args.wd},
-         {"params": no_decay, "weight_decay": 0.0}],
-        lr=args.lr
-    )
+    # decay, no_decay = [], []
+    # for n, p in model.named_parameters():
+    #     (no_decay if (n.endswith("bias") or "norm" in n.lower()) else decay).append(p)
+    # opt = torch.optim.AdamW(
+    #     [{"params": decay, "weight_decay": args.wd},
+    #      {"params": no_decay, "weight_decay": 0.0}],
+    #     lr=args.lr
+    # )
+    # optimizer：更稳健的分组策略（1D参数 & bias 不做WD）
+    def build_param_groups(m, wd):
+        decay, no_decay = [], []
+        for n, p in m.named_parameters():
+            if not p.requires_grad:
+                continue
+            if p.ndim == 1 or n.endswith(".bias"):
+                no_decay.append(p)
+            else:
+                decay.append(p)
+        return [
+            {"params": decay, "weight_decay": wd},
+            {"params": no_decay, "weight_decay": 0.0},
+        ]
+    opt = torch.optim.AdamW(build_param_groups(model, args.wd),
+                            lr=args.lr, betas=(0.9, 0.999))
 
     # EMA (single init)
     try:
@@ -221,7 +361,9 @@ def main():
         ema = None
 
     # LR schedule
-    total_steps = max(1, (args.epochs * len(tr)/ args.accum))
+    #total_steps = int(max(1, (args.epochs * len(tr) // max(1, args.accum))))
+    total_steps = args.epochs * ((len(tr) + args.accum - 1) // max(1, args.accum))
+
     # lr_fn = make_warmup_cosine(total_steps, args.lr)
     # lr_fn = make_constant(args.lr)
     lr_fn = make_const_then_cosine(total_steps,args.lr)
@@ -235,87 +377,124 @@ def main():
             cur = lr_fn(self.step_num); set_lr(cur)
             if ema is not None: ema.update()
             return cur
+        def state_dict(self): return {"step_num": self.step_num}
+        def load_state_dict(self, sd): self.step_num = int(sd.get("step_num", 0))
     sched = Stepper()
 
     # AMP
     use_amp, scaler, autocast = get_amp(args.amp)
+    print(f"[INFO] AMP {'enabled' if use_amp else 'disabled'}")
+    # Resume
+    start_epoch = 1
+    global_step = 0    
 
+    best_val = float("inf")
+
+    if args.resume:
+        try:
+            ep, global_step, extra = load_checkpoint(
+                    args.resume, model, device="cuda",
+                    optimizer=opt, scaler=scaler, ema=ema,
+                    scheduler=sched, strict=args.resume_strict
+                )
+            start_epoch = ep + 1
+            #best_val = float(extra.get("best_val", float("inf")))
+            # 确保 LR 与 global_step 对齐
+            if getattr(sched, "step_num", 0) < global_step:
+                sched.step_num = global_step
+            
+            print(f"[RESUME] from epoch {ep} (next={start_epoch}), global_step={global_step}, best_val={best_val:.4f}")
+        except Exception as e:
+            print(f"[WARN] resume failed: {e}")
+            start_epoch = 1
+            global_step = 0
+            
     # ------------- core loop -------------
     def run_epoch(loader, train: bool):
+        nonlocal global_step
+
         model.train() if train else model.eval()
         tot_loss, sum_err, seen = 0.0, 0.0, 0
         pbar = tqdm(loader, total=len(loader), ncols=130, desc="train" if train else "val")
         opt.zero_grad(set_to_none=True)
         accum = max(1, args.accum if train else 1)
-        kept_ratio = 1.0
+        cm = torch.inference_mode() if not train else torch.enable_grad()
+        with cm:
+            for i, (xb, yb) in enumerate(pbar, 1):
 
-        for i, (xb, yb) in enumerate(pbar, 1):
-            xb = xb.to(device, non_blocking=True)         # (B,K,Din)
-            yb = yb.squeeze(1).to(device, non_blocking=True)  # (B,2)
-            # 轻度防极值；标准化已在 Dataset 完成
-            xb = xb.clamp_(-10, 10)
+                xb = xb.to(device, non_blocking=True)         # (B,K,Din)
+                yb = yb.squeeze(1).to(device, non_blocking=True)  # (B,2)
+                # 轻度防极值；标准化已在 Dataset 完成
+                #xb = xb.clamp_(-10, 10)
+                #xb = xb.clamp(-20, 20)
+                with autocast():
+                    per, epe = epe_huber_loss(model(xb), yb, beta=args.beta)  # (B,), (B,)
 
-            with autocast():
-                per, epe = epe_huber_loss(model(xb), yb, beta=args.beta)  # (B,), (B,)
+                    # 可选：尾部加权（默认开启）
+                    if args.tail_tau > 0.0:
+                        w = 1.0 + args.tail_alpha * torch.sigmoid((epe - args.tail_tau) / args.tail_gamma)
+                        per = per * w
 
-                # 可选：尾部加权（默认关闭：tau<=0）
-                if args.tail_tau > 0.0:
-                    w = 1.0 + args.tail_alpha * torch.sigmoid((epe - args.tail_tau) / args.tail_gamma)
-                    per = per * w
+                    loss = per.mean()
 
-                loss = per.mean()
+                # 数值安全：跳过 NaN/Inf
+                if not torch.isfinite(loss).all():
+                    if train: opt.zero_grad(set_to_none=True)
+                    pbar.set_postfix_str("skip NaN batch")
+                    continue
 
-            # 数值安全：跳过 NaN/Inf
-            if not torch.isfinite(loss).all():
-                if train: opt.zero_grad(set_to_none=True)
-                pbar.set_postfix_str("skip NaN batch")
-                continue
+                # 反向/step（只在累积边界）
+                did_step = False
+                grad_norm = 0.0
+                if train:
+                    loss = loss / accum
+                    if use_amp: scaler.scale(loss).backward()
+                    else:       loss.backward()
 
-            # 反向/step（只在累积边界）
-            did_step = False
-            grad_norm = 0.0
-            if train:
-                if use_amp: scaler.scale(loss).backward()
-                else:       loss.backward()
-
-                if (i % accum) == 0:
-                    if use_amp:
-                        scaler.unscale_(opt)
-                        grad_norm = float(nn.utils.clip_grad_norm_(model.parameters(), 1.0))
-                        scaler.step(opt); scaler.update()
+                    if (i % accum) == 0:
+                        if use_amp:
+                            scaler.unscale_(opt)
+                            #grad_norm = float(nn.utils.clip_grad_norm_(model.parameters(), 1.0))
+                            grad_norm = float(nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0))
+                            scaler.step(opt); scaler.update()
+                        else:
+                            #grad_norm = float(nn.utils.clip_grad_norm_(model.parameters(), 1.0))
+                            grad_norm = float(nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0))
+                            opt.step()
+                        opt.zero_grad(set_to_none=True)
+                        cur_lr = sched.step()
+                        did_step = True
                     else:
-                        grad_norm = float(nn.utils.clip_grad_norm_(model.parameters(), 1.0))
-                        opt.step()
-                    opt.zero_grad(set_to_none=True)
-                    cur_lr = sched.step()
-                    did_step = True
+                        #grad_norm = 0.0
+                        cur_lr = opt.param_groups[0]["lr"]
+                    
+                    # if ema is not None:
+                    #     ema.update(model.parameters())
                 else:
                     #grad_norm = 0.0
                     cur_lr = opt.param_groups[0]["lr"]
                 
-                if ema is not None:
-                    ema.update(model.parameters())
-            else:
-                #grad_norm = 0.0
-                cur_lr = opt.param_groups[0]["lr"]
+                if did_step:
+                    global_step += 1
 
-            # 运行统计（严格样本口径）
-            bs = xb.size(0)
-            tot_loss += float(per.sum().item())
-            sum_err  += float(epe.sum().item())
-            seen     += bs
 
-            avg_loss = tot_loss / max(1, seen)
-            mean_epe = sum_err  / max(1, seen)
+                # 运行统计（严格样本口径）
+                bs = xb.size(0)
+                tot_loss += float(per.sum().item())
+                sum_err  += float(epe.sum().item())
+                seen     += bs
 
-            # 打印日志
-            grad_disp = f"{grad_norm:.3e}"
-            pbar.set_postfix(
-                avg_loss=f"{avg_loss:.6f}",
-                mean_pos_err_m=f"{mean_epe:.5f}",
-                lr=f"{cur_lr:.3e}",
-                grad=grad_disp,
-            )
+                avg_loss = tot_loss / max(1, seen)
+                mean_epe = sum_err  / max(1, seen)
+
+                # 打印日志
+                grad_disp = f"{grad_norm:.3e}"
+                pbar.set_postfix(
+                    avg_loss=f"{avg_loss:.6f}",
+                    mean_pos_err_m=f"{mean_epe:.5f}",
+                    lr=f"{cur_lr:.3e}",
+                    grad=grad_disp,
+                )
 
         return (tot_loss / max(1, seen)), (sum_err / max(1, seen))
     
@@ -348,7 +527,7 @@ def main():
     best_loss = float("inf")
     best_epe  = float("inf")
 
-    for ep in range(1, args.epochs + 1):
+    for ep in range(start_epoch, args.epochs + 1):
         tr_loss, tr_epe = run_epoch(tr, True)
 
         if ema is not None:
@@ -363,14 +542,14 @@ def main():
         
         
         with open(log_path, "a", encoding="utf-8") as f:
-            if ep == 1:  # 第一次运行，先写参数
+            if not log_path.exists() or ep == start_epoch:
                 f.write("===== Training Args =====\n")
                 for k, v in sorted(vars(args).items()):
                     f.write(f"{k}: {v}\n")
                 f.write("=========================\n")
 
             # 写 epoch 结果
-            msg = (f"Epoch {ep+1:03d} | "
+            msg = (f"Epoch {ep:03d} | "
                 f"train_loss={tr_loss:.4f} ({tr_epe:.3f} m)| "
                 f"val_loss={va_loss:.4f} ({va_epe:.3f} m)| "
                 f"lr={opt.param_groups[0]['lr']:.2e}\n")
@@ -386,10 +565,27 @@ def main():
                               "val_loss": float(va_loss),
                               "val_epe_m": float(va_epe)}}
             if ema is not None:
-                with ema.average_parameters(): torch.save(state, best_path)
+                with ema.average_parameters(): 
+                    torch.save(state, best_path)
             else:
                 torch.save(state, best_path)
             print(f"[OK] saved {best_path} (val_loss={best_loss:.4f})")
+
+        extra = {
+            "best_loss": best_loss,
+            "best_epe":  best_epe,
+            "rng": {
+                "torch":  torch.get_rng_state(),
+                "cuda":   torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
+                "numpy":  np.random.get_state(),
+                "random": pyrandom.getstate(),
+            }
+        }
+
+        save_checkpoint(
+            out_dir / "checkpoint.pt", ep, global_step, model, opt, scaler, ema,
+            scheduler=sched, extra=extra
+        )
 
         # 以 EPE 选主 best
         if va_epe < best_epe:

@@ -2,12 +2,13 @@
 set args=%1
 
 if "%arg%"=="" (
-    echo Usage: train.bat grid ^| random
+    echo Usage: train.bat grid ^| random | parity
     goto :eof
 )
 
 if "%arg%"=="grid" goto run1
 if "%arg%"=="random" goto run2
+if "%arg%"=="parity" goto run2
 
 :run1
 echo Running grid eval...
@@ -22,6 +23,15 @@ goto :eof
 echo Running random eval...
 python -m models.eval_cdf_lazy ^
   --ckpt=ckpt/grid/result/best%args%_epe.pt ^
+  --predict=current --sigma=0.1^
+  --out_dir=.\eval_out --save_csv^
+  --amp
+goto :eof
+
+:run1
+echo Running parity grid eval...
+python -m models.eval_cdf_lazy ^
+  --ckpt=ckpt/parity/result/best%args%_epe.pt ^
   --predict=current --sigma=0.1^
   --out_dir=.\eval_out --save_csv^
   --amp

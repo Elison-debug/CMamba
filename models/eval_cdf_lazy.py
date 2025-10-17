@@ -91,8 +91,16 @@ def main():
     # 数据集：强制使用 train 统计
     stats_root = Path(meta.get("train_root", eval_root.parent)) # type: ignore
     va_ds = FramesLazyDataset.from_filelist(val_files, seq_len=train_args.get("seq_len", 12), predict=train_args.get("predict", "current"), mmap=True, stats_root=stats_root)
-    va = DataLoader(va_ds, batch_size=args.batch_size, shuffle=False, num_workers=max(1, args.workers//2), pin_memory=True, persistent_workers=(args.workers>0), prefetch_factor=2)
-
+    #va = DataLoader(va_ds, batch_size=args.batch_size, shuffle=False, num_workers=max(1, args.workers//2), pin_memory=True, persistent_workers=(args.workers>0), prefetch_factor=2)
+    va = DataLoader(
+        va_ds,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=args.workers,              
+        pin_memory=True,
+        persistent_workers=(args.workers > 0),
+        prefetch_factor=4                      
+    )  
 
     # -------- 模型 --------
     model = MambaRegressor(
@@ -136,20 +144,33 @@ def main():
 
     y_true, y_pred = [], []
     t0 = time.perf_counter()
-    with torch.no_grad():
+    #with torch.no_grad():
+    with torch.inference_mode():
         pbar = tqdm(enumerate(va, 1), total=len(va), ncols=130, desc="eval")
         for i, (xb, yb) in pbar:
             xb = xb.to(device, non_blocking=True)
             yb = yb.squeeze(1).to(device, non_blocking=True)
+            # with Autocast():
+            #     yhat = model(xb)
+
+            # yt_np = yb.cpu().numpy()
+            # yp_np = yhat.cpu().numpy()
+            # y_true.append(yt_np)
+            # y_pred.append(yp_np)
+
+            # batch_err = np.sqrt(((yp_np - yt_np) ** 2).sum(axis=1))
             with Autocast():
                 yhat = model(xb)
 
-            yt_np = yb.cpu().numpy()
-            yp_np = yhat.cpu().numpy()
-            y_true.append(yt_np)
-            y_pred.append(yp_np)
+            # 在 GPU 上算 L2
+            batch_err_gpu = torch.linalg.vector_norm(yhat - yb, ord=2, dim=1)
+            # 只在需要时搬到 CPU
+            batch_err = batch_err_gpu.detach().cpu().numpy()
 
-            batch_err = np.sqrt(((yp_np - yt_np) ** 2).sum(axis=1))
+            # 如果后面要画图/保存，才把 y_true/y_pred 搬一次
+            y_true.append(yb.detach().cpu().numpy())
+            y_pred.append(yhat.detach().cpu().numpy())
+            
             bcnt = int(batch_err.size)
             if bcnt > 0:
                 bsum = float(batch_err.sum())
