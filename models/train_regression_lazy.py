@@ -580,12 +580,21 @@ def main():
                 torch.save(state, best_path)
             print(f"[OK] saved {best_path} (val_loss={best_loss:.4f})")
 
+        # make sure Torch/CUDA RNG is CPU ByteTensor to avoid 
+        # [WARN] resume failed: RNG state must be a torch.ByteTensor
+        _cpu_rng = torch.get_rng_state().to(dtype=torch.uint8, device="cpu")
+        _cuda_rng = None
+        if torch.cuda.is_available():
+            _cuda_rng = [
+                s.to(dtype=torch.uint8, device="cpu") for s in torch.cuda.get_rng_state_all()
+            ]
+
         extra = {
             "best_loss": best_loss,
             "best_epe":  best_epe,
             "rng": {
-                "torch":  torch.get_rng_state(),
-                "cuda":   torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
+                "torch":  _cpu_rng,
+                "cuda":   _cuda_rng,
                 "numpy":  np.random.get_state(),
                 "random": pyrandom.getstate(),
             }

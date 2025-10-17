@@ -14,17 +14,6 @@ State Space Models (SSMs) such as **Mamba** provide linear-time sequence modelin
 
 ---
 
-## 2. Research Questions (High-level)
-
-1. **Suitability:** Do Mamba-style SSMs conceptually match the characteristics of radio positioning data (multi-channel, long sequences)?  
-2. **Evaluation Design:** What would constitute a fair and reproducible evaluation protocol (splits, metrics, baselines) for LuViRA?  
-3. **Efficiency Considerations:** What are the likely efficiency advantages/trade-offs (parameters, memory patterns, compute/bandwidth balance) compared with FCNNs, **in theory**?  
-4. **Future Directions:** What minimal software experiments would be most informative, if time permits?
-
-*Note:* These questions guide a **survey and design document**, not an implementation.
-
----
-
 ## 3. Preliminary Study Plan
 
 - **3.1 Literature Review**
@@ -46,16 +35,13 @@ State Space Models (SSMs) such as **Mamba** provide linear-time sequence modelin
   - Identify likely bottlenecks (data I/O, sequence windowing, multi-channel handling).
   - Risks in fairness (data leakage, inconsistent preprocessing) and mitigation strategies for later work.
 
-- **3.5 Optional (If time permits; still non-implementation)**
-  - Sketch minimal experiment matrix (model variants, small-scale ablations) **without** committing to execution.
-
 ---
 
 ## 4. Objectives
 
 1. **Reproducible Software Baselines** – Train and validate CMamba on LuViRA with conservative, well-documented settings(Reproducible).  
 2. **Efficiency Assessment** – Compare training/inference time, peak memory, parameter count, and FLOPs at comparable accuracy.  
-3. **Generalization & Robustness** – Evaluate **in-trajectory** and **cross-trajectory** settings; ablate power channel, and channel mixup (including $\sigma$=0).  
+3. **Generalization & Robustness** – Evaluate **in-trajectory** and **cross-trajectory** settings; test influence of power channel, channel mixup (including $\sigma$=0).  
 4. **Hardware-Oriented Analytics (software-side):** Per-layer params/FLOPs/bytes and quantization sensitivity to guide hardware acceleration.
 
 ---
@@ -71,10 +57,10 @@ State Space Models (SSMs) such as **Mamba** provide linear-time sequence modelin
 | 5 | Oct 13–17    | Feasibility mapping: expected params/FLOPs/memory; identify I/O/sequence bottlenecks.                         |
 | 6 | Oct 20–24    | Reproducible pipeline setup: data loader/splits verified;  FCNN baseline short run (sanity numbers).          |
 | 7 | Oct 27–31    | Implement minimal CMamba; train/validate (in-trajectory) with conservative settings; log accuracy/efficiency. |
-| 8 | Nov 3–7      | Ablations v1: power channel on/off; $\sigma$=0 vs light mixup; pick stable config for next steps.                    |
+| 8 | Nov 3–7      | test v1: power channel on/off; $\sigma$=0 vs light mixup; pick stable config for next steps.                    |
 | 9 | Nov 10–14    | Cross-trajectory evaluation with the picked config; compare to FCNN baseline.                                 |
 | 10 | Nov 17–21    | Efficiency assessment: per-layer params/FLOPs/activation bytes; throughput & peak-mem curves.                |
-| 11 | Nov 24–28    | Quantization sensitivity (PTQ FP16/INT8) & hardware-oriented summary (Design Hints v1).                      |
+| 11 | Nov 24–28    | Quantization sensitivity (FP32/FP16/INT8) & hardware-oriented summary (Design Hints v1).                      |
 | 12 | Dec 1–5      | Final training runs with locked config (in-traj & cross-traj); save best checkpoints & logs.                 |
 | 13 | Dec 8–12     | Consolidate results: comparison tables, plots; write Results & Discussion draft.                             |
 | 14 | Dec 15–19    | Finalize report & slides; package code/configs/checkpoints; submit.                                          |
@@ -94,11 +80,11 @@ State Space Models (SSMs) such as **Mamba** provide linear-time sequence modelin
 
 ## 7. Resources & Reproducibility Requirements
 
-Single-GPU (RTX 3080) with FP16; fixed seeds; results and configs versioned in Git; one-click script to reproduce tables/plots.
+Single-GPU (RTX 3080) with FP32/FP16/int8; fixed seeds; results and configs versioned in Git; one-click script to reproduce tables/plots.
 
 ## 8. References
 
 1. Tian G., Yaman I., Sandra M., et al. *High-precision ML-based indoor localization with massive MIMO*, ICC 2023.  
 2. Yaman I., Tian G., Tegler E., et al. *LuViRA dataset validation and discussion: comparing vision, radio, and audio sensors for indoor localization*, J-ISPN, 2024.
 
-> Additional references on SSMs/Mamba and sequence modeling will be added during Weeks 1–2 of the review.
+> Additional references on SSMs/Mamba and sequence modeling will be added in the future.

@@ -1,12 +1,13 @@
 @echo off
 set arg=%1
-set src_path=%2
+set resume=%2
 
 if "%arg%"=="" (
     echo Usage: train.bat grid ^| random
     goto :eof
 )
-if "%src_path%"=="resume"  goto run4
+if "%resume%"=="resume"  goto run4
+    else  echo Starting fresh training...
 if "%arg%"=="grid"   goto run1
 if "%arg%"=="random" goto run2
 if "%arg%"=="parity" goto run3
@@ -55,7 +56,7 @@ python -m models.train_regression_lazy ^
 goto :eof
 
 :run4
-echo Running parity grid...
+echo Running parity grid resume from ./ckpt/parity/checkpoint.pt...
 python -m models.train_regression_lazy ^
     --features_root=./data/features/parity ^
     --seq_len=12 --input_dim=2100 ^
