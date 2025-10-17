@@ -1,0 +1,50 @@
+===== Training Args =====
+accum: 4
+amp: True
+batch_size: 32
+beta: 1.0
+d_model: 128
+epochs: 20
+features_root: ./data/features/parity
+input_dim: 2100
+load_ema_for_eval: False
+lr: 0.0003
+n_layer: 4
+out_dir: ./ckpt/parity
+patch_len: 8
+predict: current
+proj_dim: 64
+resume: 
+resume_strict: False
+seed: 1234
+seq_len: 12
+sigma: 0.15
+stride: 4
+tail_alpha: 3.0
+tail_gamma: 0.2
+tail_tau: 0.0
+train_root: data\features\parity\train
+val_root: data\features\parity\eval
+wd: 0.01
+workers: 4
+=========================
+Epoch 001 | train_loss=0.0290 (0.159 m)| val_loss=0.0344 (0.205 m)| lr=3.00e-04
+Epoch 002 | train_loss=0.0037 (0.073 m)| val_loss=0.0304 (0.188 m)| lr=2.99e-04
+Epoch 003 | train_loss=0.0025 (0.061 m)| val_loss=0.0279 (0.177 m)| lr=2.93e-04
+Epoch 004 | train_loss=0.0020 (0.054 m)| val_loss=0.0261 (0.169 m)| lr=2.84e-04
+Epoch 005 | train_loss=0.0016 (0.048 m)| val_loss=0.0251 (0.164 m)| lr=2.71e-04
+Epoch 006 | train_loss=0.0013 (0.044 m)| val_loss=0.0243 (0.161 m)| lr=2.55e-04
+Epoch 007 | train_loss=0.0011 (0.041 m)| val_loss=0.0237 (0.158 m)| lr=2.35e-04
+Epoch 008 | train_loss=0.0009 (0.037 m)| val_loss=0.0230 (0.155 m)| lr=2.14e-04
+Epoch 009 | train_loss=0.0008 (0.034 m)| val_loss=0.0227 (0.153 m)| lr=1.90e-04
+Epoch 010 | train_loss=0.0007 (0.031 m)| val_loss=0.0228 (0.153 m)| lr=1.66e-04
+Epoch 011 | train_loss=0.0006 (0.028 m)| val_loss=0.0228 (0.152 m)| lr=1.41e-04
+Epoch 012 | train_loss=0.0005 (0.026 m)| val_loss=0.0227 (0.151 m)| lr=1.16e-04
+Epoch 013 | train_loss=0.0004 (0.024 m)| val_loss=0.0228 (0.151 m)| lr=9.24e-05
+Epoch 014 | train_loss=0.0003 (0.022 m)| val_loss=0.0231 (0.151 m)| lr=7.03e-05
+Epoch 015 | train_loss=0.0003 (0.021 m)| val_loss=0.0234 (0.152 m)| lr=5.05e-05
+Epoch 016 | train_loss=0.0003 (0.019 m)| val_loss=0.0237 (0.152 m)| lr=3.34e-05
+Epoch 017 | train_loss=0.0002 (0.018 m)| val_loss=0.0240 (0.153 m)| lr=1.96e-05
+Epoch 018 | train_loss=0.0002 (0.018 m)| val_loss=0.0241 (0.153 m)| lr=9.40e-06
+Epoch 019 | train_loss=0.0002 (0.017 m)| val_loss=0.0242 (0.153 m)| lr=3.15e-06
+Epoch 020 | train_loss=0.0002 (0.017 m)| val_loss=0.0243 (0.153 m)| lr=1.00e-06

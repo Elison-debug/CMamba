@@ -52,7 +52,16 @@ def load_checkpoint(path, model,
                     optimizer=None, scaler=None, ema=None,
                     scheduler=None, strict=False):
     print(f"[CKPT] loading from {path}")
-    ckpt = torch.load(path, map_location=device)
+    try:
+        ckpt = torch.load(path, map_location=device, weights_only=True)
+    except Exception as e:
+        print(f"[CKPT][warn] safe load failed: {e}")
+        try:
+            ckpt = torch.load(path, map_location=device, weights_only=False)
+            print("[CKPT][warn] loaded with weights_only=False; only do this if you trust the checkpoint source.")
+        except Exception as e:
+            print(f"[CKPT][warn] unsafe load failed: {e}")
+            raise
 
     # 1) 模型
     missing, unexpected = model.load_state_dict(ckpt["model"], strict=strict)
