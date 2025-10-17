@@ -1,0 +1,402 @@
+[CFG] seq_len=12, proj_dim=64, d_model=128, n_layer=4, patch_len=8, stride=4, predict=current
+[VAL] files=33 (root=data\features\parity\eval)
+
+[FILE] Grid102.npz
+[STATS] N=4265  mean=0.6196 m  median=0.5034 m  P80=0.8780 m  P90=1.2922 m
+[SUMMARY of Grid102.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.6196 |
+| Median | 0.5034 |
+| P80    | 0.8780 |
+| P90    | 1.2922 |
+| Max    | 2.0201 |
+
+[FILE] Grid104.npz
+[STATS] N=4266  mean=0.1522 m  median=0.1326 m  P80=0.2168 m  P90=0.2728 m
+[SUMMARY of Grid104.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.1522 |
+| Median | 0.1326 |
+| P80    | 0.2168 |
+| P90    | 0.2728 |
+| Max    | 0.5437 |
+
+[FILE] Grid106.npz
+[STATS] N=4267  mean=0.1362 m  median=0.1175 m  P80=0.1996 m  P90=0.2583 m
+[SUMMARY of Grid106.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.1362 |
+| Median | 0.1175 |
+| P80    | 0.1996 |
+| P90    | 0.2583 |
+| Max    | 0.7423 |
+
+[FILE] Grid108.npz
+[STATS] N=4263  mean=0.2012 m  median=0.1684 m  P80=0.2848 m  P90=0.3685 m
+[SUMMARY of Grid108.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.2012 |
+| Median | 0.1684 |
+| P80    | 0.2848 |
+| P90    | 0.3685 |
+| Max    | 1.1495 |
+
+[FILE] Grid110.npz
+[STATS] N=4254  mean=0.3110 m  median=0.2315 m  P80=0.4770 m  P90=0.6585 m
+[SUMMARY of Grid110.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.3110 |
+| Median | 0.2315 |
+| P80    | 0.4770 |
+| P90    | 0.6585 |
+| Max    | 1.5959 |
+
+[FILE] Grid112.npz
+[STATS] N=4270  mean=0.1394 m  median=0.1266 m  P80=0.2027 m  P90=0.2447 m
+[SUMMARY of Grid112.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.1394 |
+| Median | 0.1266 |
+| P80    | 0.2027 |
+| P90    | 0.2447 |
+| Max    | 0.4709 |
+
+[FILE] Grid114.npz
+[STATS] N=4266  mean=0.1324 m  median=0.1189 m  P80=0.1918 m  P90=0.2367 m
+[SUMMARY of Grid114.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.1324 |
+| Median | 0.1189 |
+| P80    | 0.1918 |
+| P90    | 0.2367 |
+| Max    | 0.4960 |
+
+[FILE] Grid116.npz
+[STATS] N=4253  mean=0.1257 m  median=0.1176 m  P80=0.1797 m  P90=0.2207 m
+[SUMMARY of Grid116.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.1257 |
+| Median | 0.1176 |
+| P80    | 0.1797 |
+| P90    | 0.2207 |
+| Max    | 0.4360 |
+
+[FILE] Grid118.npz
+[STATS] N=4284  mean=0.1304 m  median=0.1116 m  P80=0.1682 m  P90=0.2189 m
+[SUMMARY of Grid118.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.1304 |
+| Median | 0.1116 |
+| P80    | 0.1682 |
+| P90    | 0.2189 |
+| Max    | 1.1773 |
+
+[FILE] Grid122.npz
+[STATS] N=4270  mean=0.1937 m  median=0.1258 m  P80=0.3399 m  P90=0.4652 m
+[SUMMARY of Grid122.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.1937 |
+| Median | 0.1258 |
+| P80    | 0.3399 |
+| P90    | 0.4652 |
+| Max    | 0.7316 |
+
+[FILE] Grid124.npz
+[STATS] N=4272  mean=0.1959 m  median=0.1520 m  P80=0.3073 m  P90=0.4244 m
+[SUMMARY of Grid124.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.1959 |
+| Median | 0.1520 |
+| P80    | 0.3073 |
+| P90    | 0.4244 |
+| Max    | 0.7549 |
+
+[FILE] Grid126.npz
+[STATS] N=4271  mean=0.0765 m  median=0.0599 m  P80=0.1155 m  P90=0.1574 m
+[SUMMARY of Grid126.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.0765 |
+| Median | 0.0599 |
+| P80    | 0.1155 |
+| P90    | 0.1574 |
+| Max    | 0.3200 |
+
+[FILE] Grid128.npz
+[STATS] N=4263  mean=0.0716 m  median=0.0586 m  P80=0.1044 m  P90=0.1429 m
+[SUMMARY of Grid128.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.0716 |
+| Median | 0.0586 |
+| P80    | 0.1044 |
+| P90    | 0.1429 |
+| Max    | 0.3231 |
+
+[FILE] Grid130.npz
+[STATS] N=4271  mean=0.1111 m  median=0.0993 m  P80=0.1612 m  P90=0.2014 m
+[SUMMARY of Grid130.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.1111 |
+| Median | 0.0993 |
+| P80    | 0.1612 |
+| P90    | 0.2014 |
+| Max    | 0.4101 |
+
+[FILE] Grid132.npz
+[STATS] N=4257  mean=0.1493 m  median=0.1418 m  P80=0.2111 m  P90=0.2613 m
+[SUMMARY of Grid132.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.1493 |
+| Median | 0.1418 |
+| P80    | 0.2111 |
+| P90    | 0.2613 |
+| Max    | 0.3831 |
+
+[FILE] Grid134.npz
+[STATS] N=4278  mean=0.2187 m  median=0.1762 m  P80=0.2875 m  P90=0.4883 m
+[SUMMARY of Grid134.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.2187 |
+| Median | 0.1762 |
+| P80    | 0.2875 |
+| P90    | 0.4883 |
+| Max    | 0.9907 |
+
+[FILE] Grid136.npz
+[STATS] N=4253  mean=0.0968 m  median=0.0879 m  P80=0.1377 m  P90=0.1703 m
+[SUMMARY of Grid136.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.0968 |
+| Median | 0.0879 |
+| P80    | 0.1377 |
+| P90    | 0.1703 |
+| Max    | 0.3199 |
+
+[FILE] Grid138.npz
+[STATS] N=4272  mean=0.2150 m  median=0.1801 m  P80=0.3191 m  P90=0.4037 m
+[SUMMARY of Grid138.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.2150 |
+| Median | 0.1801 |
+| P80    | 0.3191 |
+| P90    | 0.4037 |
+| Max    | 0.8123 |
+
+[FILE] Grid140.npz
+[STATS] N=4255  mean=0.0881 m  median=0.0837 m  P80=0.1321 m  P90=0.1580 m
+[SUMMARY of Grid140.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.0881 |
+| Median | 0.0837 |
+| P80    | 0.1321 |
+| P90    | 0.1580 |
+| Max    | 0.2895 |
+
+[FILE] Grid142.npz
+[STATS] N=4261  mean=0.0976 m  median=0.0890 m  P80=0.1403 m  P90=0.1728 m
+[SUMMARY of Grid142.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.0976 |
+| Median | 0.0890 |
+| P80    | 0.1403 |
+| P90    | 0.1728 |
+| Max    | 0.3624 |
+
+[FILE] Grid144.npz
+[STATS] N=4263  mean=0.1235 m  median=0.0915 m  P80=0.1809 m  P90=0.2588 m
+[SUMMARY of Grid144.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.1235 |
+| Median | 0.0915 |
+| P80    | 0.1809 |
+| P90    | 0.2588 |
+| Max    | 0.5059 |
+
+[FILE] Grid146.npz
+[STATS] N=4260  mean=0.1526 m  median=0.1198 m  P80=0.2252 m  P90=0.3344 m
+[SUMMARY of Grid146.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.1526 |
+| Median | 0.1198 |
+| P80    | 0.2252 |
+| P90    | 0.3344 |
+| Max    | 0.5784 |
+
+[FILE] Grid148.npz
+[STATS] N=4258  mean=0.1622 m  median=0.1374 m  P80=0.2486 m  P90=0.3178 m
+[SUMMARY of Grid148.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.1622 |
+| Median | 0.1374 |
+| P80    | 0.2486 |
+| P90    | 0.3178 |
+| Max    | 0.5783 |
+
+[FILE] Grid150.npz
+[STATS] N=4261  mean=0.0835 m  median=0.0725 m  P80=0.1322 m  P90=0.1600 m
+[SUMMARY of Grid150.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.0835 |
+| Median | 0.0725 |
+| P80    | 0.1322 |
+| P90    | 0.1600 |
+| Max    | 0.2749 |
+
+[FILE] Grid152.npz
+[STATS] N=4268  mean=0.1242 m  median=0.1093 m  P80=0.1750 m  P90=0.2148 m
+[SUMMARY of Grid152.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.1242 |
+| Median | 0.1093 |
+| P80    | 0.1750 |
+| P90    | 0.2148 |
+| Max    | 0.4971 |
+
+[FILE] Grid154.npz
+[STATS] N=4247  mean=0.0895 m  median=0.0762 m  P80=0.1298 m  P90=0.1709 m
+[SUMMARY of Grid154.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.0895 |
+| Median | 0.0762 |
+| P80    | 0.1298 |
+| P90    | 0.1709 |
+| Max    | 0.3815 |
+
+[FILE] Grid156.npz
+[STATS] N=4260  mean=0.0772 m  median=0.0691 m  P80=0.1158 m  P90=0.1407 m
+[SUMMARY of Grid156.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.0772 |
+| Median | 0.0691 |
+| P80    | 0.1158 |
+| P90    | 0.1407 |
+| Max    | 0.2618 |
+
+[FILE] Grid158.npz
+[STATS] N=4269  mean=0.0781 m  median=0.0661 m  P80=0.1217 m  P90=0.1538 m
+[SUMMARY of Grid158.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.0781 |
+| Median | 0.0661 |
+| P80    | 0.1217 |
+| P90    | 0.1538 |
+| Max    | 0.2874 |
+
+[FILE] Grid160.npz
+[STATS] N=4266  mean=0.1100 m  median=0.0919 m  P80=0.1755 m  P90=0.2158 m
+[SUMMARY of Grid160.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.1100 |
+| Median | 0.0919 |
+| P80    | 0.1755 |
+| P90    | 0.2158 |
+| Max    | 0.4183 |
+
+[FILE] Grid162.npz
+[STATS] N=4264  mean=0.1271 m  median=0.1003 m  P80=0.1936 m  P90=0.2455 m
+[SUMMARY of Grid162.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.1271 |
+| Median | 0.1003 |
+| P80    | 0.1936 |
+| P90    | 0.2455 |
+| Max    | 0.5457 |
+
+[FILE] Grid164.npz
+[STATS] N=4260  mean=0.1122 m  median=0.0978 m  P80=0.1657 m  P90=0.2291 m
+[SUMMARY of Grid164.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.1122 |
+| Median | 0.0978 |
+| P80    | 0.1657 |
+| P90    | 0.2291 |
+| Max    | 0.4537 |
+
+[FILE] Grid168.npz
+[STATS] N=4263  mean=0.0840 m  median=0.0701 m  P80=0.1347 m  P90=0.1657 m
+[SUMMARY of Grid168.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.0840 |
+| Median | 0.0701 |
+| P80    | 0.1347 |
+| P90    | 0.1657 |
+| Max    | 0.2862 |
+
+[FILE] Grid174.npz
+[STATS] N=4262  mean=0.2754 m  median=0.2153 m  P80=0.3147 m  P90=0.4499 m
+[SUMMARY of Grid174.npz ]
+| Metric | Value (m) |
+|--------|-----------|
+| Mean   | 0.2754 |
+| Median | 0.2153 |
+| P80    | 0.3147 |
+| P90    | 0.4499 |
+| Max    | 2.0255 |
+
+==================== RANKING (by mean error) ====================
+ 1. mean=0.0716 m | median=0.0586 | P80=0.1044 | P90=0.1429 | N=4263 | file=Grid128.npz | out=eval_out\Grid128
+ 2. mean=0.0765 m | median=0.0599 | P80=0.1155 | P90=0.1574 | N=4271 | file=Grid126.npz | out=eval_out\Grid126
+ 3. mean=0.0772 m | median=0.0691 | P80=0.1158 | P90=0.1407 | N=4260 | file=Grid156.npz | out=eval_out\Grid156
+ 4. mean=0.0781 m | median=0.0661 | P80=0.1217 | P90=0.1538 | N=4269 | file=Grid158.npz | out=eval_out\Grid158
+ 5. mean=0.0835 m | median=0.0725 | P80=0.1322 | P90=0.1600 | N=4261 | file=Grid150.npz | out=eval_out\Grid150
+ 6. mean=0.0840 m | median=0.0701 | P80=0.1347 | P90=0.1657 | N=4263 | file=Grid168.npz | out=eval_out\Grid168
+ 7. mean=0.0881 m | median=0.0837 | P80=0.1321 | P90=0.1580 | N=4255 | file=Grid140.npz | out=eval_out\Grid140
+ 8. mean=0.0895 m | median=0.0762 | P80=0.1298 | P90=0.1709 | N=4247 | file=Grid154.npz | out=eval_out\Grid154
+ 9. mean=0.0968 m | median=0.0879 | P80=0.1377 | P90=0.1703 | N=4253 | file=Grid136.npz | out=eval_out\Grid136
+10. mean=0.0976 m | median=0.0890 | P80=0.1403 | P90=0.1728 | N=4261 | file=Grid142.npz | out=eval_out\Grid142
+11. mean=0.1100 m | median=0.0919 | P80=0.1755 | P90=0.2158 | N=4266 | file=Grid160.npz | out=eval_out\Grid160
+12. mean=0.1111 m | median=0.0993 | P80=0.1612 | P90=0.2014 | N=4271 | file=Grid130.npz | out=eval_out\Grid130
+13. mean=0.1122 m | median=0.0978 | P80=0.1657 | P90=0.2291 | N=4260 | file=Grid164.npz | out=eval_out\Grid164
+14. mean=0.1235 m | median=0.0915 | P80=0.1809 | P90=0.2588 | N=4263 | file=Grid144.npz | out=eval_out\Grid144
+15. mean=0.1242 m | median=0.1093 | P80=0.1750 | P90=0.2148 | N=4268 | file=Grid152.npz | out=eval_out\Grid152
+16. mean=0.1257 m | median=0.1176 | P80=0.1797 | P90=0.2207 | N=4253 | file=Grid116.npz | out=eval_out\Grid116
+17. mean=0.1271 m | median=0.1003 | P80=0.1936 | P90=0.2455 | N=4264 | file=Grid162.npz | out=eval_out\Grid162
+18. mean=0.1304 m | median=0.1116 | P80=0.1682 | P90=0.2189 | N=4284 | file=Grid118.npz | out=eval_out\Grid118
+19. mean=0.1324 m | median=0.1189 | P80=0.1918 | P90=0.2367 | N=4266 | file=Grid114.npz | out=eval_out\Grid114
+20. mean=0.1362 m | median=0.1175 | P80=0.1996 | P90=0.2583 | N=4267 | file=Grid106.npz | out=eval_out\Grid106
+21. mean=0.1394 m | median=0.1266 | P80=0.2027 | P90=0.2447 | N=4270 | file=Grid112.npz | out=eval_out\Grid112
+22. mean=0.1493 m | median=0.1418 | P80=0.2111 | P90=0.2613 | N=4257 | file=Grid132.npz | out=eval_out\Grid132
+23. mean=0.1522 m | median=0.1326 | P80=0.2168 | P90=0.2728 | N=4266 | file=Grid104.npz | out=eval_out\Grid104
+24. mean=0.1526 m | median=0.1198 | P80=0.2252 | P90=0.3344 | N=4260 | file=Grid146.npz | out=eval_out\Grid146
+25. mean=0.1622 m | median=0.1374 | P80=0.2486 | P90=0.3178 | N=4258 | file=Grid148.npz | out=eval_out\Grid148
+26. mean=0.1937 m | median=0.1258 | P80=0.3399 | P90=0.4652 | N=4270 | file=Grid122.npz | out=eval_out\Grid122
+27. mean=0.1959 m | median=0.1520 | P80=0.3073 | P90=0.4244 | N=4272 | file=Grid124.npz | out=eval_out\Grid124
+28. mean=0.2012 m | median=0.1684 | P80=0.2848 | P90=0.3685 | N=4263 | file=Grid108.npz | out=eval_out\Grid108
+29. mean=0.2150 m | median=0.1801 | P80=0.3191 | P90=0.4037 | N=4272 | file=Grid138.npz | out=eval_out\Grid138
+30. mean=0.2187 m | median=0.1762 | P80=0.2875 | P90=0.4883 | N=4278 | file=Grid134.npz | out=eval_out\Grid134
+31. mean=0.2754 m | median=0.2153 | P80=0.3147 | P90=0.4499 | N=4262 | file=Grid174.npz | out=eval_out\Grid174
+32. mean=0.3110 m | median=0.2315 | P80=0.4770 | P90=0.6585 | N=4254 | file=Grid110.npz | out=eval_out\Grid110
+33. mean=0.6196 m | median=0.5034 | P80=0.8780 | P90=1.2922 | N=4265 | file=Grid102.npz | out=eval_out\Grid102
+=================================================================
+

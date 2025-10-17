@@ -1,14 +1,18 @@
 @echo off
-set args=%1
+set arg=%1
+set args=%2
+set multi=%3
 
 if "%arg%"=="" (
     echo Usage: train.bat grid ^| random | parity
     goto :eof
 )
 
+if "%multi%"=="multi"  goto run4
+    else  echo invalid args %multi%...
 if "%arg%"=="grid" goto run1
 if "%arg%"=="random" goto run2
-if "%arg%"=="parity" goto run2
+if "%arg%"=="parity" goto run3
 
 :run1
 echo Running grid eval...
@@ -19,18 +23,27 @@ python -m models.eval_cdf_lazy ^
   --amp
 goto :eof
 
-:run1
+:run2
 echo Running random eval...
-python -m models.eval_cdf_lazy ^
+python -m models.eval.eval_cdf_lazy ^
   --ckpt=ckpt/grid/result/best%args%_epe.pt ^
   --predict=current --sigma=0.1^
   --out_dir=.\eval_out --save_csv^
   --amp
 goto :eof
 
-:run1
+:run3
 echo Running parity grid eval...
-python -m models.eval_cdf_lazy ^
+python -m models.eval.eval_cdf_lazy ^
+  --ckpt=ckpt/parity/result/best%args%_epe.pt ^
+  --predict=current --sigma=0.1^
+  --out_dir=.\eval_out --save_csv^
+  --amp
+goto :eof
+
+:run4
+echo Running multi eval...
+python -m models.eval.eval_multi ^
   --ckpt=ckpt/parity/result/best%args%_epe.pt ^
   --predict=current --sigma=0.1^
   --out_dir=.\eval_out --save_csv^

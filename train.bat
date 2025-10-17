@@ -18,7 +18,7 @@ goto :eof
 
 :run1
 echo Running grid...
-python -m models.train_regression_lazy ^
+python -m models.training.train_regression_lazy ^
     --features_root=./data/features/grid ^
     --seq_len=12 --input_dim=2100 ^
     --proj_dim=64 --d_model=128 ^
@@ -31,7 +31,7 @@ goto :eof
 
 :run2
 echo Running random...
-python -m models.train_regression_lazy ^
+python -m models.training.train_regression_lazy ^
     --features_root=./data/features/random ^
     --seq_len=12 --input_dim=2100 ^
     --proj_dim=64 --d_model=128 ^
@@ -44,7 +44,7 @@ goto :eof
 
 :run3
 echo Running parity grid...
-python -m models.train_regression_lazy ^
+python -m models.training.train_regression_lazy ^
     --features_root=./data/features/parity ^
     --seq_len=12 --input_dim=2100 ^
     --proj_dim=64 --d_model=128 ^
@@ -57,7 +57,7 @@ goto :eof
 
 :run4
 echo Running parity grid resume from ./ckpt/parity/checkpoint.pt...
-python -m models.train_regression_lazy ^
+python -m models.training.train_regression_lazy ^
     --features_root=./data/features/parity ^
     --seq_len=12 --input_dim=2100 ^
     --proj_dim=64 --d_model=128 ^
