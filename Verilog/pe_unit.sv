@@ -9,70 +9,84 @@
 //     mode = 2'b10 → EWA: result = a_in + b_in
 //   - Unified PE used for all phases of SSM
 //   - One clock-cycle latency
+//   - Supports fixed-point arithmetic for Q8.8 format
+//   - a_in, b_in: Q8.8 (16-bit signed)
+//   - Multiplier output: Q16.16 (32-bit)
+//   - Shift right 16 bits to restore Q8.8
 //---------------------------------------------------------------
 
 module pe_unit #(
-    parameter DATA_WIDTH = 16
+    parameter DATA_WIDTH = 16,
+    parameter FRAC_BITS  = 8   // Q8.8 format → shift 16 bits (2*FRAC_BITS)
 )(
-    input  logic                     clk,        // system clock
-    input  logic                     rst_n,      // asynchronous active-low reset
-    input  logic                     valid_in,   // input data valid
-    input  logic [1:0]               mode,       // 00:MAC, 01:EWM, 10:EWA
-    input  logic signed [DATA_WIDTH-1:0] a_in,   // operand A (e.g. weight)
-    input  logic signed [DATA_WIDTH-1:0] b_in,   // operand B (e.g. feature)
-    input  logic signed [DATA_WIDTH-1:0] acc_in, // accumulated input (for MAC)
-    output logic signed [DATA_WIDTH-1:0] result_out, // operation result
-    output logic                     valid_out   // output data valid
+    input  logic                         clk,
+    input  logic                         rst_n,
+    input  logic                         valid_in,
+    input  logic [1:0]                   mode,       // 00:MAC, 01:EWM, 10:EWA
+    input  logic signed [DATA_WIDTH-1:0] a_in,       // Q8.8
+    input  logic signed [DATA_WIDTH-1:0] b_in,       // Q8.8
+    input  logic signed [DATA_WIDTH-1:0] acc_in,     // Q8.8
+    output logic signed [DATA_WIDTH-1:0] result_out, // Q8.8
+    output logic                         valid_out
 );
 
-    // Internal signal declarations
-    logic signed [DATA_WIDTH-1:0] mult_res;
-    logic signed [DATA_WIDTH-1:0] add_res;
-    logic signed [DATA_WIDTH-1:0] mac_res;
-    logic valid_out_n;
+    // ============================================================
+    // Internal extended signals
+    // ============================================================
+    logic signed [2*DATA_WIDTH-1:0] mult_full;    // Q16.16 full precision
+    logic signed [DATA_WIDTH-1:0]   mult_scaled;  // after shift → Q8.8
+    logic signed [DATA_WIDTH:0]     add_full;     // one extra bit for overflow
+    logic signed [DATA_WIDTH-1:0]   add_trunc;    // truncated 16-bit result
+    logic                           valid_out_n;
 
-    // ----------------------------------------------------------------
-    // Combinational logic: unified arithmetic with mode control
-    // ----------------------------------------------------------------
+    // ============================================================
+    // Combinational arithmetic logic
+    // ============================================================
     always_comb begin
-        // default
-        mult_res    = '0;
-        add_res     = '0;
-        mac_res     = '0;
+        mult_full   = '0;
+        mult_scaled = '0;
+        add_full    = '0;
+        add_trunc   = '0;
         valid_out_n = 1'b0;
 
         if (valid_in) begin
-            mult_res = a_in * b_in;  // always computed in parallel
+            // ------------------------------------------------------------
+            // 1. Fixed-point multiply (Q8.8 × Q8.8 = Q16.16)
+            // ------------------------------------------------------------
+            mult_full   = a_in * b_in;
 
+            // ------------------------------------------------------------
+            // 2. Shift right 16 bits ( FRAC_BITS) to restore Q8.8
+            // ------------------------------------------------------------
+            mult_scaled = mult_full >>>  FRAC_BITS;
+
+            // ------------------------------------------------------------
+            // 3. Mode selection
+            // ------------------------------------------------------------
             case (mode)
-                2'b00: begin // MAC
-                    mac_res = mult_res + acc_in;
-                    add_res = mac_res;
-                end
-                2'b01: begin // EWM (multiply only)
-                    add_res = mult_res;
-                end
-                2'b10: begin // EWA (adder bypasses multiplier)
-                    add_res = a_in + b_in;
-                end
-                default: begin
-                    add_res = '0;
-                end
+                2'b00: add_full = mult_scaled + acc_in; // MAC
+                2'b01: add_full = mult_scaled;          // EWM
+                2'b10: add_full = a_in + b_in;          // EWA (no scaling)
+                default: add_full = '0;
             endcase
 
+            // ------------------------------------------------------------
+            // 4. Truncate / (optional: add saturation later)
+            // ------------------------------------------------------------
+            add_trunc   = add_full[DATA_WIDTH-1:0];
             valid_out_n = 1'b1;
         end
     end
 
-    // ----------------------------------------------------------------
-    // Sequential logic: output register (one-cycle latency)
-    // ----------------------------------------------------------------
+    // ============================================================
+    // Sequential output register (1-cycle latency)
+    // ============================================================
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             result_out <= '0;
             valid_out  <= 1'b0;
         end else begin
-            result_out <= add_res;   // operation result
+            result_out <= add_trunc;
             valid_out  <= valid_out_n;
         end
     end

@@ -1,143 +1,134 @@
-Controller FSM for SSM Accelerator (x_t preloaded in FBUF)
-----------------------------------------------------------
+───────────────────────────────────────────────────────────────
+[0] IDLE
+───────────────────────────────────────────────────────────────
+• Function : Wait for start signal, clear internal flags/counters
+• Mode     : — 
+• Inputs   : — 
+• Outputs  : — 
+• Parallel : —
+• Purpose  : Controller initialization and reset
 
-States:
-IDLE → X_PROJ → DT_PROJ → SOFTPLUS → ΔA_CALC → EXP → A_B_CALC → EWA1 → C_D_CALC → EWA2 → DONE
+───────────────────────────────────────────────────────────────
+[1] X_PROJ
+───────────────────────────────────────────────────────────────
+• Mode     : 000 (MAC)
+• Compute  : Δ_raw = Wx_pj ⊙ x_t
+• Inputs   : WBUF(Wx_pj), FBUF(x_t)
+• Outputs  : FBUF(Δ_raw)
+• Parallel : —
+• Purpose  : Project input feature x_t into Δ_raw domain
 
-----------------------------------------------------------
-1. IDLE
-----------------------------------------------------------
-- Function: Wait for external start signal, reset address counters.
-- Control Signals:
-  start_array=0; reset_addr_fbuf=1; reset_addr_wbuf=1; reset_addr_hbuf=1; mode_array=IDLE; valid_in=0
-- Handshake: Wait for start=1
-- Wait: if (start==1)
-- Next: X_PROJ
+───────────────────────────────────────────────────────────────
+[2] DT_PROJ
+───────────────────────────────────────────────────────────────
+• Mode     : 000 (MAC)
+• Compute  : Δ_t = W_Δ ⊙ Δ_raw
+• Inputs   : WBUF(W_Δ), FBUF(Δ_raw)
+• Outputs  : FBUF(Δ_t)
+• Parallel : —
+• Purpose  : Compute intermediate Δ_t for temporal update
 
-----------------------------------------------------------
-2. X_PROJ (MAC)
-----------------------------------------------------------
-- Operation: RAW = W_xpj × x_t
-- Control Signals:
-  start_array=1; mode_array=MAC_MODE; mode_mac=XPROJ;
-  rd_en_wbuf=1 (bank=Wx_pj); rd_en_fbuf=1 (zone=X_ZONE);
-  wr_en_fbuf=1 (zone=RAW_ZONE);
-  addr_wbuf+=16; addr_fbuf+=16
-- Data Input: 16 data per cycle to array (x_t from FBUF, W_xpj from WBUF)
-- Handshake: array_valid_in=1; wait done_mac=1
-- Wait: if (done_mac==1)
-- Next: DT_PROJ
+───────────────────────────────────────────────────────────────
+[3] DT_PROJ_B
+───────────────────────────────────────────────────────────────
+• Mode     : 100 (EWA-Vector)
+• Compute  : Δ_t_b = Δ_t + dt_bias
+• Inputs   : FBUF(Δ_t), WBUF(dt_bias)
+• Outputs  : FBUF(Δ_t_b)
+• Parallel : —
+• Purpose  : Add bias before Softplus nonlinearity
 
-----------------------------------------------------------
-3. DT_PROJ (MAC + bias)
-----------------------------------------------------------
-- Operation: Δ_t = W_Δ × Δ_raw + bias
-- Control Signals:
-  start_array=1; mode_array=MAC_MODE; mode_mac=DTPROJ;
-  rd_en_wbuf=1 (bank=W_Δ); rd_en_bbuf=1 (bank=bias);
-  rd_en_fbuf=1 (zone=Δ_raw);
-  wr_en_fbuf=1 (zone=Δ_t);
-  addr_wbuf+=16; addr_fbuf+=16
-- Handshake: array_valid_in=1; wait done_mac=1
-- Wait: if (done_mac==1)
-- Next: SOFTPLUS
+───────────────────────────────────────────────────────────────
+[4] SP_B_CALC
+───────────────────────────────────────────────────────────────
+• Mode     : 011 (EWM-Outer)
+• Compute  : B_x = x_t ⊗ B_raw
+• Inputs   : FBUF(x_t), WBUF(B_raw)
+• Outputs  : FBUF(B_x)
+• Parallel : Softplus(Δ_t_b) → FBUF(spΔ_t)
+• Purpose  : 
+    - Generate B_x for later ΔB_x computation  
+    - Concurrently compute Softplus(Δ_t_b) producing spΔ_t
 
-----------------------------------------------------------
-4. SOFTPLUS (Nonlinear)
-----------------------------------------------------------
-- Operation: spΔ_t = ln(1 + e^{Δ_t})
-- Control Signals:
-  start_sp=1; fbuf_sel_in=Δ_t; fbuf_sel_out=spΔ_t;
-  rd_en_fbuf=1; wr_en_fbuf=1
-- Handshake: sp_valid_in=1 → sp_ready_out; wait done_sp=1
-- Wait: if (done_sp==1)
-- Next: ΔA_CALC
+───────────────────────────────────────────────────────────────
+[5] A_CALC
+───────────────────────────────────────────────────────────────
+• Mode     : 001 (EWM-Matrix)
+• Compute  : ΔA = spΔ_t ⊙ A
+• Inputs   : FBUF(spΔ_t), WBUF(A)
+• Outputs  : FBUF(ΔA)
+• Parallel : Softplus module finalizing spΔ_t stream
+• Purpose  : Compute ΔA matrix for EXP and A_ht-1 path
 
-----------------------------------------------------------
-5. ΔA_CALC (EWM mode1)
-----------------------------------------------------------
-- Operation: ΔA = spΔ_t ⊙ A
-- Control Signals:
-  start_array=1; mode_array=EWM_MODE; mode_ewm=1;
-  rd_en_fbuf=1 (spΔ_t); rd_en_wbuf=1 (A);
-  wr_en_fbuf=1 (ΔA); addr_wbuf+=16; addr_fbuf+=16
-- Handshake: array_valid_in=1; wait done_ewm=1
-- Wait: if (done_ewm==1)
-- Next: EXP
+───────────────────────────────────────────────────────────────
+[6] ΔB_CALC
+───────────────────────────────────────────────────────────────
+• Mode     : 001 (EWM-Matrix)
+• Compute  : ΔB_x = spΔ_t ⊙ B_x
+• Inputs   : FBUF(spΔ_t), FBUF(B_x)
+• Outputs  : FBUF(ΔB_x)
+• Parallel : Start EXP(ΔA)
+• Purpose  : Produce ΔB_x for hidden state update (EWA1)
 
-----------------------------------------------------------
-6. EXP (Nonlinear)
-----------------------------------------------------------
-- Operation: EXP_ΔA = e^{ΔA}
-- Control Signals:
-  start_exp=1; rd_en_fbuf=1 (ΔA); wr_en_fbuf=1 (expΔA)
-- Handshake: exp_valid_in=1; wait done_exp=1
-- Wait: if (done_exp==1)
-- Next: A_B_CALC
+───────────────────────────────────────────────────────────────
+[7] EXP_D_CALC
+───────────────────────────────────────────────────────────────
+• Mode     : 010 (EWM-Vector)
+• Compute  : D_x = D ⊙ x_t
+• Inputs   : WBUF(D), FBUF(x_t)
+• Outputs  : FBUF(D_x)
+• Parallel : EXP(ΔA) → FBUF(EXP_ΔA)
+• Purpose  : 
+    - Compute D_x in D path  
+    - Concurrently compute EXP(ΔA) for A_ht-1 generation
 
-----------------------------------------------------------
-7. A_B_CALC (EWM Parallel)
-----------------------------------------------------------
-- Operation:
-  A_ht-1 = EXP(ΔA) ⊙ h_{t-1}
-  ΔB_x = spΔ_t ⊙ (B_raw ⊗ x_t)
-- Control Signals:
-  start_array=1; mode_array=EWM_MODE;
-  mode_ewm=4 (A-path) + mode_ewm=2 (B-path);
-  rd_en_fbuf=1 (expΔA, spΔ_t, x_t, B_raw);
-  rd_en_hbuf=1 (h_{t-1}); wr_en_fbuf=1 (A_ht-1, ΔB_x)
-- Data Input: 16 data per row/column per cycle
-- Handshake: array_valid_in=1; wait done_ewm_A & done_ewm_B
-- Wait: if (done_ewm_A & done_ewm_B)
-- Next: EWA1
+───────────────────────────────────────────────────────────────
+[8] A_HT_CALC
+───────────────────────────────────────────────────────────────
+• Mode     : 110 (EWM-Matrix2)
+• Compute  : A_ht-1 = EXP_ΔA ⊙ h_{t-1}
+• Inputs   : FBUF(EXP_ΔA), HBUF(h_{t-1})
+• Outputs  : FBUF(A_ht-1)
+• Parallel : —
+• Purpose  : Apply exponential modulation to previous hidden state
 
-----------------------------------------------------------
-8. EWA1 (Add)
-----------------------------------------------------------
-- Operation: h_t = A_ht-1 + ΔB_x
-- Control Signals:
-  start_ewa=1; mode_array=EWA_MODE; mode_ewa=0;
-  rd_en_fbuf=1 (A_ht-1, ΔB_x); wr_en_hbuf=1 (h_t)
-- Handshake: ewa_valid_in=1; wait done_ewa=1
-- Wait: if (done_ewa==1)
-- Next: C_D_CALC
+───────────────────────────────────────────────────────────────
+[9] EWA1
+───────────────────────────────────────────────────────────────
+• Mode     : 101 (EWA-Matrix)
+• Compute  : h_t = A_ht-1 + ΔB_x
+• Inputs   : FBUF(A_ht-1), FBUF(ΔB_x)
+• Outputs  : HBUF(h_t)
+• Parallel : Prefetch C_raw and D weights from WBUF
+• Purpose  : Update hidden state matrix h_t
 
-----------------------------------------------------------
-9. C_D_CALC (EWM + Reduction Tree)
-----------------------------------------------------------
-- Operation:
-  C_h = C_raw ⊗ h_t → Reduction
-  D_x = D ⊙ x_t
-- Control Signals:
-  start_array=1; mode_array=EWM_MODE;
-  mode_ewm=6 (C-path); reduce_en=1;
-  rd_en_fbuf=1 (C_raw, x_t); rd_en_hbuf=1 (h_t);
-  rd_en_wbuf=1 (D); wr_en_fbuf=1 (C_h, D_x)
-- Data Input: 16×16 tile per iteration
-- Handshake: array_valid_in=1; wait done_reduce & done_ewm
-- Wait: if (done_reduce & done_ewm)
-- Next: EWA2
+───────────────────────────────────────────────────────────────
+[10] C_CALC
+───────────────────────────────────────────────────────────────
+• Mode     : 011 (EWM-Outer)
+• Compute  : C_h = h_t ⊗ C_raw
+• Inputs   : HBUF(h_t), WBUF(C_raw)
+• Outputs  : FBUF(C_h)
+• Parallel : —
+• Purpose  : Compute outer product for output mixing
 
-----------------------------------------------------------
-10. EWA2 (Add)
-----------------------------------------------------------
-- Operation: y_t = C_h + D_x
-- Control Signals:
-  start_ewa=1; mode_array=EWA_MODE; mode_ewa=1;
-  rd_en_fbuf=1 (C_h, D_x); wr_en_obuf=1 (y_t)
-- Handshake: ewa_valid_in=1; wait done_ewa=1
-- Wait: if (done_ewa==1)
-- Next: DONE
+───────────────────────────────────────────────────────────────
+[11] EWA2
+───────────────────────────────────────────────────────────────
+• Mode     : 100 (EWA-Vector)
+• Compute  : y = C_h + D_x
+• Inputs   : FBUF(C_h), FBUF(D_x)
+• Outputs  : OBUF(y)
+• Parallel : —
+• Purpose  : Combine C and D paths to form final output vector y_t
 
-----------------------------------------------------------
-11. DONE
-----------------------------------------------------------
-- Function: End of computation, signal completion.
-- Control Signals:
-  start_array=0; wr_en_fbuf=0; rd_en_fbuf=0; done_flag=1
-- Next: IDLE
-
-----------------------------------------------------------
-Data Transfer Granularity:
-- Each cycle, the array receives 16 data elements per input channel (one tile row/column per cycle).
-- Each MAC/EWM/EWA operation processes one 16×16 tile block per iteration.
+───────────────────────────────────────────────────────────────
+[12] DONE
+───────────────────────────────────────────────────────────────
+• Function : Assert finish=1; notify upper control layer
+• Mode     : —
+• Inputs   : —
+• Outputs  : finish signal
+• Parallel : —
+• Purpose  : Mark the end of one SSM time-step
+───────────────────────────────────────────────────────────────

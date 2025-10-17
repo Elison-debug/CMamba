@@ -1,6 +1,6 @@
 //---------------------------------------------------------------
 // Testbench: tb_recfg_array
-// Purpose  : Verify recfg_array (modes 100–101, ASCII-safe)
+// Purpose  : Verify recfg_array (modes 100–110, ASCII-safe)
 // Author   : Shengjie Chen
 //---------------------------------------------------------------
 `timescale 1ns/1ps
@@ -11,9 +11,9 @@ module tb_recfg_array_EWA;
     localparam D_INNER    = 256;
     localparam DT_RANK    = 8;
     localparam D_STATE    = 16;
-    localparam OUT_SIZE   = DT_RANK + 2*D_STATE; // 40
-    localparam N_ROWBLK   = (OUT_SIZE + TILE_SIZE - 1) / TILE_SIZE; // 3
-    localparam N_COLBLK   = D_INNER / TILE_SIZE; // 16
+    localparam OUT_SIZE   = DT_RANK + 2*D_STATE;
+    localparam N_ROWBLK   = (OUT_SIZE + TILE_SIZE - 1) / TILE_SIZE;
+    localparam N_COLBLK   = D_INNER / TILE_SIZE;
 
     reg  clk, rst_n, valid_in, accumulate_en;
     reg  [2:0] mode;
@@ -50,7 +50,13 @@ module tb_recfg_array_EWA;
     reg signed [31:0] ref_ewa_mat [0:D_INNER-1][0:D_STATE-1];
     reg signed [DATA_WIDTH-1:0] hw_ewa_mat [0:D_INNER-1][0:D_STATE-1];
 
-    integer mismatch100, mismatch101;
+    // -------- for MODE110 --------
+    reg signed [DATA_WIDTH-1:0] EXP_DA [0:D_INNER-1][0:D_STATE-1];
+    reg signed [DATA_WIDTH-1:0] H_prev [0:D_INNER-1][0:D_STATE-1];
+    reg signed [31:0] ref_mat_110 [0:D_INNER-1][0:D_STATE-1];
+    reg signed [DATA_WIDTH-1:0] hw_mat_110 [0:D_INNER-1][0:D_STATE-1];
+
+    integer mismatch100, mismatch101, mismatch110;
 
     // ============================================================
     // Stimulus
@@ -58,7 +64,7 @@ module tb_recfg_array_EWA;
     initial begin
         @(posedge rst_n);
         $display("===============================================");
-        $display("MODE100 and MODE101 verification start");
+        $display("MODE100–MODE110 verification start");
         $display("===============================================");
 
         //---------------------------
@@ -144,9 +150,56 @@ module tb_recfg_array_EWA;
         end
         $display("[MODE101 mismatches=%0d]\n", mismatch101);
 
+        //---------------------------
+        // MODE110 : EWM-Matrix2 (A_ht-1 = EXP_ΔA ⊙ h_t-1)
+        //---------------------------
+        $display("\n[MODE110] EWM-Matrix2: A_ht-1 = EXP_DA * H_prev");
+        mode = 3'b110; accumulate_en = 0;
+
+        for (i=0;i<D_INNER;i++)
+            for (j=0;j<D_STATE;j++) begin
+                EXP_DA[i][j] = ($random%8)-4;
+                H_prev[i][j] = ($random%8)-4;
+                ref_mat_110[i][j] = EXP_DA[i][j] * H_prev[i][j];
+            end
+
+        for (rb=0; rb<D_INNER/TILE_SIZE; rb++) begin
+            for (i=0;i<TILE_SIZE;i++) begin
+                int r = rb*TILE_SIZE+i;
+                for (j=0;j<TILE_SIZE;j++) begin
+                    a_in[i][j] = EXP_DA[r][j];
+                    b_mat[i][j] = H_prev[r][j];
+                end
+            end
+            @(posedge clk); valid_in=1; @(posedge clk); valid_in=0;
+            @(posedge done_tile); @(posedge clk);
+            for (i=0;i<TILE_SIZE;i++) begin
+                int r = rb*TILE_SIZE+i;
+                for (j=0;j<TILE_SIZE;j++)
+                    hw_mat_110[r][j] = result_out_mat[i][j];
+            end
+        end
+
+        mismatch110 = 0;
+        for (i=0;i<D_INNER;i++)
+            for (j=0;j<D_STATE;j++)
+                if (hw_mat_110[i][j] !== ref_mat_110[i][j])
+                    mismatch110++;
+
+        $display("\nMODE110 Result Comparison (first 4x4 block):");
+        for (i=0;i<4;i++) begin
+            for (j=0;j<4;j++)
+                $write("%6d ", hw_mat_110[i][j]);
+            $display("");
+        end
+        $display("[MODE110 mismatches=%0d]\n", mismatch110);
+
+        //---------------------------
+        // Summary
+        //---------------------------
         $display("==============================================================");
-        $display("[SUMMARY] MODE100=%0d mismatches  MODE101=%0d mismatches",
-                 mismatch100, mismatch101);
+        $display("[SUMMARY] MODE100=%0d  MODE101=%0d  MODE110=%0d mismatches",
+                 mismatch100, mismatch101, mismatch110);
         $display("==============================================================");
         $finish;
     end
