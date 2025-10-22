@@ -239,7 +239,7 @@ def main():
     ap.add_argument("--beta", type=float, default=1.0, help="SmoothL1 (Huber) delta, meter")
 
     # Tail weighting (optional; default off)
-    ap.add_argument("--tail_tau", type=float, default=0.0, help=">0 启用尾部加权的起点阈值(m)，建议0.5")
+    ap.add_argument("--tail_tau", type=float, default=0.5, help=">0 启用尾部加权的起点阈值(m)，建议0.5")
     ap.add_argument("--tail_alpha", type=float, default=3.0)
     ap.add_argument("--tail_gamma", type=float, default=0.2)
 

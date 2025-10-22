@@ -153,20 +153,23 @@ class CMamba(nn.Module):
         # B, V, L = x.shape
         # P = self.args.patch_len
         # S = self.args.stride
+
+        B, V, L = x.shape; P = self.args.patch_len; S = self.args.stride
+
+        x = x.unfold(2, P, S).contiguous()            # (B,V,num_patches,P)
+        x = x.permute(0,2,1,3).reshape(B, -1, V*P)    # (B,num_patches,V*P)
+        #print(f"Calculated number of patches: {num_patches}") if self.args.v else None
+
+
         # Manual patching
         # patches = []
         # for i in range(0, L - P + 1, S):
         #     patch = x[:, :, i:i+P].reshape(B, -1)
         #     patches.append(patch)
         # x: (B, V, L), P=self.args.patch_len, S=self.args.stride
-
-        B, V, L = x.shape; P = self.args.patch_len; S = self.args.stride
-        x = x.unfold(2, P, S).contiguous()            # (B,V,num_patches,P)
-        x = x.permute(0,2,1,3).reshape(B, -1, V*P)    # (B,num_patches,V*P)
-        #print(f"Calculated number of patches: {num_patches}") if self.args.v else None
-
         #x = torch.stack(patches, dim=1)  # (B, num_patches, V*P)
         #print("after patching", x.shape) if self.args.v else None
+
         # Patch embedding
         x = self.patch_embedding(x)  # (B, num_patches, d_model)
         print("after patch embedding", x.shape) if self.args.v else None
@@ -224,26 +227,24 @@ class MambaBlock(nn.Module):
     def forward(self, x):
         (b, l, d) = x.shape
         
+        #x_and_res = self.in_proj(x)
         x_and_res = self.in_proj(self.norm_in(x))  # ← 使用归一化后的输入
-        #x_and_res = torch.clamp(x_and_res, -6.0, 6.0)        # ← 新增：限幅
-        if torch.isnan(x).any(): print("[DBG] NaN after in_proj")
+
+        #if torch.isnan(x).any(): print("[DBG] NaN after in_proj")
+
         (x, res) = x_and_res.split(split_size=[self.args.d_inner, self.args.d_inner], dim=-1)
 
         x = rearrange(x, 'b l d_in -> b d_in l')
         x = self.conv1d(x)[:, :, :l]
-        if torch.isnan(x).any(): print("[DBG] NaN after conv1d")
+        #if torch.isnan(x).any(): print("[DBG] NaN after conv1d")
         x = rearrange(x, 'b d_in l -> b l d_in')
         
         x = F.silu(x)
         #x = torch.nan_to_num(x, nan=0.0, posinf=1e6, neginf=-1e6)  # ← 新增
         y = self.ssm(x)
-        if torch.isnan(y).any(): print("[DBG] NaN after ssm()")
-        #y = y * F.silu(res)
-        
-        # ④ 残差分支限幅后再乘，用 RMSNorm 的输入不会被无限放大
-        res_gated = F.silu(res)
-        #res_gated = torch.clamp(res_gated, -6.0, 6.0)        # ← 新增：限幅
-        y = y * res_gated
+        #if torch.isnan(y).any(): print("[DBG] NaN after ssm()")
+
+        y = y * F.silu(res)
         
         output = self.out_proj(y)
         #output = torch.nan_to_num(output, nan=0.0, posinf=1e6, neginf=-1e6)  # ← 新增
@@ -278,7 +279,7 @@ class MambaBlock(nn.Module):
         
         (delta, B, C) = x_dbl.split(split_size=[self.args.dt_rank, n, n], dim=-1)  # delta: (b, l, dt_rank). B, C: (b, l, n)
         delta = F.softplus(self.dt_proj(delta))  # (b, l, d_in)
-        #delta = delta.clamp(1e-4, 5.0)           # ← 新增：避免过小/过大
+
         y = self.selective_scan(x, delta, A, B, C, D)  # This is similar to run_SSM(A, B, C, u) in The Annotated S4 [2]
         
         return y
@@ -292,10 +293,13 @@ class MambaBlock(nn.Module):
         # - A is discretized using zero-order hold (ZOH) discretization (see Section 2 Equation 4 in the Mamba paper [1])
         # - B is discretized using a simplified Euler discretization instead of ZOH. From a discussion with authors:
         #   "A is the more important term and the performance doesn't change much with the simplification on B"
+
         # deltaA = torch.exp(einsum(delta, A, 'b l d_in, d_in n -> b l d_in n'))
-        z = einsum(delta, A, 'b l d_in, d_in n -> b l d_in n')  # 原来直接 exp(...)
-        #z = torch.clamp(z, min=-20.0, max=20.0)
-        deltaA = torch.exp(z)  
+
+        z = einsum(delta, A, 'b l d_in, d_in n -> b l d_in n')  
+        deltaA = torch.exp(z)  # 数学上等价于 exp(...) 但更高效
+        # 调试/可视化 时能直接看到线性项；
+        # 梯度回溯 时更清晰（autograd 图中节点更少重组）
 
         deltaB_u = einsum(delta, B, u, 'b l d_in, b l n, b l d_in -> b l d_in n')
         
@@ -306,14 +310,12 @@ class MambaBlock(nn.Module):
         ys = []    
         for i in range(l):
             x = deltaA[:, i] * x + deltaB_u[:, i]
-            #x = torch.nan_to_num(x, nan=0.0, posinf=1e6, neginf=-1e6)  # ← 新增
             y = einsum(x, C[:, i, :], 'b d_in n, b n -> b d_in')
-            #y = torch.nan_to_num(y, nan=0.0, posinf=1e6, neginf=-1e6)  # ← 新增
             ys.append(y)
         y = torch.stack(ys, dim=1)  # shape (b, l, d_in)
         
         y = y + u * D
-        y = torch.nan_to_num(y, nan=0.0, posinf=1e6, neginf=-1e6)  # ← 新增
+        #y = torch.nan_to_num(y, nan=0.0, posinf=1e6, neginf=-1e6)  # ← 新增
     
         return y
 

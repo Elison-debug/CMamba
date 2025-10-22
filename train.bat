@@ -6,8 +6,7 @@ if "%arg%"=="" (
     echo Usage: train.bat grid ^| random
     goto :eof
 )
-if "%resume%"=="resume"  goto run4
-    else  echo Starting fresh training...
+if "%resume%"=="resume" (goto run4)
 if "%arg%"=="grid"   goto run1
 if "%arg%"=="random" goto run2
 if "%arg%"=="parity" goto run3
@@ -50,7 +49,7 @@ python -m models.training.train_regression_lazy ^
     --proj_dim=64 --d_model=128 ^
     --n_layer=4 --patch_len=8 ^
     --stride=4 --batch_size=32 ^
-    --epochs=20 --lr=3e-4 --sigma=0.15 ^
+    --epochs=20 --lr=3e-4 --sigma=0.1 ^
     --wd=0.01 --out_dir=./ckpt/parity ^
     --amp --accum=4
 goto :eof
@@ -63,7 +62,7 @@ python -m models.training.train_regression_lazy ^
     --proj_dim=64 --d_model=128 ^
     --n_layer=4 --patch_len=8 ^
     --stride=4 --batch_size=32 ^
-    --epochs=20 --lr=3e-4 --sigma=0.15 ^
+    --epochs=20 --lr=3e-4 --sigma=0.1 ^
     --wd=0.01 --out_dir=./ckpt/parity ^
     --amp --accum=4 ^
     --resume=./ckpt/parity/checkpoint.pt ^
