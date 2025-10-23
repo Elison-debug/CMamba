@@ -28,7 +28,7 @@ echo Running random eval...
 python -m models.eval.eval_cdf_lazy ^
   --ckpt=ckpt/grid/result/best%args%_epe.pt ^
   --predict=current --sigma=0.1^
-  --out_dir=.\eval_out --save_csv^
+  --out_dir=eval_out --save_csv^
   --amp
 goto :eof
 
@@ -37,7 +37,7 @@ echo Running parity grid eval...
 python -m models.eval.eval_cdf_lazy ^
   --ckpt=ckpt/parity/result/best%args%_epe.pt ^
   --predict=current --sigma=0.1^
-  --out_dir=.\eval_out --save_csv^
+  --out_dir=eval_out --save_csv^
   --amp
 goto :eof
 
@@ -46,7 +46,7 @@ echo Running multi eval...
 python -m models.eval.eval_multi ^
   --ckpt=ckpt/parity/result/best%args%_epe.pt ^
   --predict=current --sigma=0.1^
-  --out_dir=.\eval_out --save_csv^
+  --out_dir=eval_out_parity_%args% --save_csv^
   --amp
 goto :eof
 
@@ -54,7 +54,7 @@ goto :eof
 echo Running testing eval...
 python -m models.eval.eval_multi ^
   --ckpt=ckpt/lessData/result/best%args%_epe.pt ^
-  --predict=current
-  --out_dir=.\eval_out_testing --save_csv^
-  --amp
+  --predict=current --sigma=0.1^
+  --out_dir=eval_out_testing_%args% --save_csv^
+  --amp --eval_root=./data/features/lessData/test
 goto :eof

@@ -1,0 +1,176 @@
+===== Training Args =====
+accum: 4
+amp: True
+batch_size: 32
+beta: 1.0
+d_model: 128
+epochs: 20
+features_root: ./data/features/lessData
+input_dim: 2100
+load_ema_for_eval: False
+lr: 0.0003
+n_layer: 4
+out_dir: ./ckpt/lessData
+patch_len: 8
+predict: current
+proj_dim: 64
+resume: 
+resume_strict: False
+seed: 1234
+seq_len: 12
+sigma: 0.1
+stride: 4
+tail_alpha: 3.0
+tail_gamma: 0.2
+tail_tau: 0.5
+train_root: data\features\lessData\train
+val_root: data\features\lessData\eval
+wd: 0.01
+workers: 4
+=========================
+Epoch 001 | train_loss=0.0952 (0.169 m)| val_loss=0.0337 (0.170 m)| lr=3.00e-04
+Epoch 002 | train_loss=0.0049 (0.072 m)| val_loss=0.0220 (0.142 m)| lr=2.99e-04
+Epoch 003 | train_loss=0.0033 (0.060 m)| val_loss=0.0172 (0.128 m)| lr=2.93e-04
+Epoch 004 | train_loss=0.0027 (0.054 m)| val_loss=0.0143 (0.119 m)| lr=2.84e-04
+Epoch 005 | train_loss=0.0022 (0.049 m)| val_loss=0.0123 (0.111 m)| lr=2.71e-04
+Epoch 006 | train_loss=0.0019 (0.046 m)| val_loss=0.0110 (0.106 m)| lr=2.55e-04
+Epoch 007 | train_loss=0.0031 (0.052 m)| val_loss=0.0105 (0.103 m)| lr=2.35e-04
+Epoch 008 | train_loss=0.0011 (0.035 m)| val_loss=0.0105 (0.102 m)| lr=2.14e-04
+Epoch 009 | train_loss=0.0010 (0.033 m)| val_loss=0.0098 (0.099 m)| lr=1.90e-04
+Epoch 010 | train_loss=0.0009 (0.032 m)| val_loss=0.0092 (0.096 m)| lr=1.66e-04
+Epoch 011 | train_loss=0.0008 (0.030 m)| val_loss=0.0087 (0.093 m)| lr=1.41e-04
+Epoch 012 | train_loss=0.0007 (0.027 m)| val_loss=0.0083 (0.091 m)| lr=1.16e-04
+Epoch 013 | train_loss=0.0005 (0.025 m)| val_loss=0.0081 (0.090 m)| lr=9.25e-05
+Epoch 014 | train_loss=0.0005 (0.023 m)| val_loss=0.0079 (0.089 m)| lr=7.04e-05
+Epoch 015 | train_loss=0.0004 (0.021 m)| val_loss=0.0078 (0.088 m)| lr=5.05e-05
+Epoch 016 | train_loss=0.0003 (0.019 m)| val_loss=0.0078 (0.088 m)| lr=3.34e-05
+Epoch 017 | train_loss=0.0003 (0.018 m)| val_loss=0.0077 (0.088 m)| lr=1.96e-05
+Epoch 018 | train_loss=0.0003 (0.017 m)| val_loss=0.0077 (0.087 m)| lr=9.43e-06
+Epoch 019 | train_loss=0.0002 (0.016 m)| val_loss=0.0077 (0.087 m)| lr=3.17e-06
+Epoch 020 | train_loss=0.0002 (0.016 m)| val_loss=0.0077 (0.087 m)| lr=1.00e-06
+
+Running parity with lessData...
+[OK] Loaded stats (train): data\features\lessData\stats_train.npz Din=2100
+[OK] Loaded stats (train): data\features\lessData\stats_train.npz Din=2100
+[SPLIT] train files=35  val files=35
+[INFO]  train samples=119258 | val samples=29481
+[INFO] AMP enabled
+train: 100%|█████████| 3726/3726 [05:54<00:00, 10.50it/s, avg_loss=0.095189, grad=0.000e+00, lr=3.000e-04, mean_pos_err_m=0.16893]
+val: 100%|█████████████| 922/922 [00:28<00:00, 32.42it/s, avg_loss=0.033688, grad=0.000e+00, lr=3.000e-04, mean_pos_err_m=0.17020]
+Epoch 001 | train 0.0952 (0.169 m) | val 0.0337 (0.170 m) | lr 3.00e-04
+[OK] saved ckpt\lessData\result\best1.pt (val_loss=0.0337)
+[CKPT] saved -> ckpt\lessData\checkpoint.pt
+[OK] saved ckpt\lessData\result\best1_epe.pt (val_epe=0.1702 m)
+train: 100%|█████████| 3726/3726 [06:08<00:00, 10.11it/s, avg_loss=0.004948, grad=0.000e+00, lr=2.987e-04, mean_pos_err_m=0.07243]
+val: 100%|█████████████| 922/922 [00:26<00:00, 35.01it/s, avg_loss=0.021979, grad=0.000e+00, lr=2.987e-04, mean_pos_err_m=0.14246]
+Epoch 002 | train 0.0049 (0.072 m) | val 0.0220 (0.142 m) | lr 2.99e-04
+[OK] saved ckpt\lessData\result\best1.pt (val_loss=0.0220)
+[CKPT] saved -> ckpt\lessData\checkpoint.pt
+[OK] saved ckpt\lessData\result\best1_epe.pt (val_epe=0.1425 m)
+train: 100%|█████████| 3726/3726 [06:16<00:00,  9.90it/s, avg_loss=0.003292, grad=0.000e+00, lr=2.933e-04, mean_pos_err_m=0.05972]
+val: 100%|█████████████| 922/922 [00:25<00:00, 36.62it/s, avg_loss=0.017155, grad=0.000e+00, lr=2.933e-04, mean_pos_err_m=0.12830]
+Epoch 003 | train 0.0033 (0.060 m) | val 0.0172 (0.128 m) | lr 2.93e-04
+[OK] saved ckpt\lessData\result\best1.pt (val_loss=0.0172)
+[CKPT] saved -> ckpt\lessData\checkpoint.pt
+[OK] saved ckpt\lessData\result\best1_epe.pt (val_epe=0.1283 m)
+train: 100%|█████████| 3726/3726 [06:15<00:00,  9.92it/s, avg_loss=0.002663, grad=0.000e+00, lr=2.840e-04, mean_pos_err_m=0.05394]
+val: 100%|█████████████| 922/922 [00:25<00:00, 36.47it/s, avg_loss=0.014347, grad=0.000e+00, lr=2.840e-04, mean_pos_err_m=0.11894]
+Epoch 004 | train 0.0027 (0.054 m) | val 0.0143 (0.119 m) | lr 2.84e-04
+[OK] saved ckpt\lessData\result\best1.pt (val_loss=0.0143)
+[CKPT] saved -> ckpt\lessData\checkpoint.pt
+[OK] saved ckpt\lessData\result\best1_epe.pt (val_epe=0.1189 m)
+train: 100%|█████████| 3726/3726 [06:19<00:00,  9.82it/s, avg_loss=0.002166, grad=0.000e+00, lr=2.709e-04, mean_pos_err_m=0.04886]
+val: 100%|█████████████| 922/922 [00:25<00:00, 36.42it/s, avg_loss=0.012266, grad=0.000e+00, lr=2.709e-04, mean_pos_err_m=0.11122]
+Epoch 005 | train 0.0022 (0.049 m) | val 0.0123 (0.111 m) | lr 2.71e-04
+[OK] saved ckpt\lessData\result\best1.pt (val_loss=0.0123)
+[CKPT] saved -> ckpt\lessData\checkpoint.pt
+[OK] saved ckpt\lessData\result\best1_epe.pt (val_epe=0.1112 m)
+train: 100%|█████████| 3726/3726 [06:00<00:00, 10.34it/s, avg_loss=0.001923, grad=0.000e+00, lr=2.545e-04, mean_pos_err_m=0.04595]
+val: 100%|█████████████| 922/922 [00:24<00:00, 37.05it/s, avg_loss=0.010966, grad=0.000e+00, lr=2.545e-04, mean_pos_err_m=0.10560]
+Epoch 006 | train 0.0019 (0.046 m) | val 0.0110 (0.106 m) | lr 2.55e-04
+[OK] saved ckpt\lessData\result\best1.pt (val_loss=0.0110)
+[CKPT] saved -> ckpt\lessData\checkpoint.pt
+[OK] saved ckpt\lessData\result\best1_epe.pt (val_epe=0.1056 m)
+train: 100%|█████████| 3726/3726 [05:59<00:00, 10.36it/s, avg_loss=0.003075, grad=0.000e+00, lr=2.353e-04, mean_pos_err_m=0.05159]
+val: 100%|█████████████| 922/922 [00:24<00:00, 37.03it/s, avg_loss=0.010548, grad=0.000e+00, lr=2.353e-04, mean_pos_err_m=0.10339]
+Epoch 007 | train 0.0031 (0.052 m) | val 0.0105 (0.103 m) | lr 2.35e-04
+[OK] saved ckpt\lessData\result\best1.pt (val_loss=0.0105)
+[CKPT] saved -> ckpt\lessData\checkpoint.pt
+[OK] saved ckpt\lessData\result\best1_epe.pt (val_epe=0.1034 m)
+train: 100%|█████████| 3726/3726 [05:58<00:00, 10.39it/s, avg_loss=0.001079, grad=0.000e+00, lr=2.136e-04, mean_pos_err_m=0.03503]
+val: 100%|█████████████| 922/922 [00:25<00:00, 36.73it/s, avg_loss=0.010506, grad=0.000e+00, lr=2.136e-04, mean_pos_err_m=0.10212]
+Epoch 008 | train 0.0011 (0.035 m) | val 0.0105 (0.102 m) | lr 2.14e-04
+[OK] saved ckpt\lessData\result\best1.pt (val_loss=0.0105)
+[CKPT] saved -> ckpt\lessData\checkpoint.pt
+[OK] saved ckpt\lessData\result\best1_epe.pt (val_epe=0.1021 m)
+train: 100%|█████████| 3726/3726 [06:00<00:00, 10.35it/s, avg_loss=0.000966, grad=0.000e+00, lr=1.902e-04, mean_pos_err_m=0.03303]
+val: 100%|█████████████| 922/922 [00:25<00:00, 36.79it/s, avg_loss=0.009848, grad=0.000e+00, lr=1.902e-04, mean_pos_err_m=0.09884]
+Epoch 009 | train 0.0010 (0.033 m) | val 0.0098 (0.099 m) | lr 1.90e-04
+[OK] saved ckpt\lessData\result\best1.pt (val_loss=0.0098)
+[CKPT] saved -> ckpt\lessData\checkpoint.pt
+[OK] saved ckpt\lessData\result\best1_epe.pt (val_epe=0.0988 m)
+train: 100%|█████████| 3726/3726 [05:59<00:00, 10.35it/s, avg_loss=0.000889, grad=0.000e+00, lr=1.657e-04, mean_pos_err_m=0.03169]
+val: 100%|█████████████| 922/922 [00:24<00:00, 36.93it/s, avg_loss=0.009177, grad=0.000e+00, lr=1.657e-04, mean_pos_err_m=0.09560]
+Epoch 010 | train 0.0009 (0.032 m) | val 0.0092 (0.096 m) | lr 1.66e-04
+[OK] saved ckpt\lessData\result\best1.pt (val_loss=0.0092)
+[CKPT] saved -> ckpt\lessData\checkpoint.pt
+[OK] saved ckpt\lessData\result\best1_epe.pt (val_epe=0.0956 m)
+train: 100%|█████████| 3726/3726 [05:59<00:00, 10.36it/s, avg_loss=0.000779, grad=0.000e+00, lr=1.408e-04, mean_pos_err_m=0.02978]
+val: 100%|█████████████| 922/922 [00:25<00:00, 36.29it/s, avg_loss=0.008680, grad=0.000e+00, lr=1.408e-04, mean_pos_err_m=0.09313]
+Epoch 011 | train 0.0008 (0.030 m) | val 0.0087 (0.093 m) | lr 1.41e-04
+[OK] saved ckpt\lessData\result\best1.pt (val_loss=0.0087)
+[CKPT] saved -> ckpt\lessData\checkpoint.pt
+[OK] saved ckpt\lessData\result\best1_epe.pt (val_epe=0.0931 m)
+train: 100%|█████████| 3726/3726 [06:01<00:00, 10.31it/s, avg_loss=0.000652, grad=0.000e+00, lr=1.162e-04, mean_pos_err_m=0.02730]
+val: 100%|█████████████| 922/922 [00:25<00:00, 36.07it/s, avg_loss=0.008337, grad=0.000e+00, lr=1.162e-04, mean_pos_err_m=0.09133]
+Epoch 012 | train 0.0007 (0.027 m) | val 0.0083 (0.091 m) | lr 1.16e-04
+[OK] saved ckpt\lessData\result\best1.pt (val_loss=0.0083)
+[CKPT] saved -> ckpt\lessData\checkpoint.pt
+[OK] saved ckpt\lessData\result\best1_epe.pt (val_epe=0.0913 m)
+train: 100%|█████████| 3726/3726 [06:02<00:00, 10.29it/s, avg_loss=0.000544, grad=0.000e+00, lr=9.245e-05, mean_pos_err_m=0.02497]
+val: 100%|█████████████| 922/922 [00:25<00:00, 36.40it/s, avg_loss=0.008060, grad=0.000e+00, lr=9.245e-05, mean_pos_err_m=0.08977]
+Epoch 013 | train 0.0005 (0.025 m) | val 0.0081 (0.090 m) | lr 9.25e-05
+[OK] saved ckpt\lessData\result\best1.pt (val_loss=0.0081)
+[CKPT] saved -> ckpt\lessData\checkpoint.pt
+[OK] saved ckpt\lessData\result\best1_epe.pt (val_epe=0.0898 m)
+train: 100%|█████████| 3726/3726 [06:01<00:00, 10.30it/s, avg_loss=0.000452, grad=0.000e+00, lr=7.037e-05, mean_pos_err_m=0.02282]
+val: 100%|█████████████| 922/922 [00:25<00:00, 36.37it/s, avg_loss=0.007891, grad=0.000e+00, lr=7.037e-05, mean_pos_err_m=0.08874]
+Epoch 014 | train 0.0005 (0.023 m) | val 0.0079 (0.089 m) | lr 7.04e-05
+[OK] saved ckpt\lessData\result\best1.pt (val_loss=0.0079)
+[CKPT] saved -> ckpt\lessData\checkpoint.pt
+[OK] saved ckpt\lessData\result\best1_epe.pt (val_epe=0.0887 m)
+train: 100%|█████████| 3726/3726 [06:02<00:00, 10.27it/s, avg_loss=0.000384, grad=0.000e+00, lr=5.051e-05, mean_pos_err_m=0.02108]
+val: 100%|█████████████| 922/922 [00:25<00:00, 36.58it/s, avg_loss=0.007803, grad=0.000e+00, lr=5.051e-05, mean_pos_err_m=0.08821]
+Epoch 015 | train 0.0004 (0.021 m) | val 0.0078 (0.088 m) | lr 5.05e-05
+[OK] saved ckpt\lessData\result\best1.pt (val_loss=0.0078)
+[CKPT] saved -> ckpt\lessData\checkpoint.pt
+[OK] saved ckpt\lessData\result\best1_epe.pt (val_epe=0.0882 m)
+train: 100%|█████████| 3726/3726 [06:02<00:00, 10.28it/s, avg_loss=0.000319, grad=0.000e+00, lr=3.344e-05, mean_pos_err_m=0.01927]
+val: 100%|█████████████| 922/922 [00:25<00:00, 36.74it/s, avg_loss=0.007770, grad=0.000e+00, lr=3.344e-05, mean_pos_err_m=0.08795]
+Epoch 016 | train 0.0003 (0.019 m) | val 0.0078 (0.088 m) | lr 3.34e-05
+[OK] saved ckpt\lessData\result\best1.pt (val_loss=0.0078)
+[CKPT] saved -> ckpt\lessData\checkpoint.pt
+[OK] saved ckpt\lessData\result\best1_epe.pt (val_epe=0.0880 m)
+train: 100%|█████████| 3726/3726 [05:57<00:00, 10.41it/s, avg_loss=0.000279, grad=0.000e+00, lr=1.961e-05, mean_pos_err_m=0.01806]
+val: 100%|█████████████| 922/922 [00:25<00:00, 36.75it/s, avg_loss=0.007733, grad=0.000e+00, lr=1.961e-05, mean_pos_err_m=0.08770]
+Epoch 017 | train 0.0003 (0.018 m) | val 0.0077 (0.088 m) | lr 1.96e-05
+[OK] saved ckpt\lessData\result\best1.pt (val_loss=0.0077)
+[CKPT] saved -> ckpt\lessData\checkpoint.pt
+[OK] saved ckpt\lessData\result\best1_epe.pt (val_epe=0.0877 m)
+train: 100%|█████████| 3726/3726 [05:58<00:00, 10.38it/s, avg_loss=0.000252, grad=0.000e+00, lr=9.431e-06, mean_pos_err_m=0.01716]
+val: 100%|█████████████| 922/922 [00:24<00:00, 37.60it/s, avg_loss=0.007700, grad=0.000e+00, lr=9.431e-06, mean_pos_err_m=0.08749]
+Epoch 018 | train 0.0003 (0.017 m) | val 0.0077 (0.087 m) | lr 9.43e-06
+[OK] saved ckpt\lessData\result\best1.pt (val_loss=0.0077)
+[CKPT] saved -> ckpt\lessData\checkpoint.pt
+[OK] saved ckpt\lessData\result\best1_epe.pt (val_epe=0.0875 m)
+train: 100%|█████████| 3726/3726 [05:48<00:00, 10.68it/s, avg_loss=0.000229, grad=0.000e+00, lr=3.168e-06, mean_pos_err_m=0.01636]
+val: 100%|█████████████| 922/922 [00:24<00:00, 37.75it/s, avg_loss=0.007704, grad=0.000e+00, lr=3.168e-06, mean_pos_err_m=0.08746]
+Epoch 019 | train 0.0002 (0.016 m) | val 0.0077 (0.087 m) | lr 3.17e-06
+[CKPT] saved -> ckpt\lessData\checkpoint.pt
+[OK] saved ckpt\lessData\result\best1_epe.pt (val_epe=0.0875 m)
+train: 100%|█████████| 3726/3726 [05:48<00:00, 10.70it/s, avg_loss=0.000220, grad=0.000e+00, lr=1.001e-06, mean_pos_err_m=0.01605]
+val: 100%|█████████████| 922/922 [00:24<00:00, 37.87it/s, avg_loss=0.007683, grad=0.000e+00, lr=1.001e-06, mean_pos_err_m=0.08737]
+Epoch 020 | train 0.0002 (0.016 m) | val 0.0077 (0.087 m) | lr 1.00e-06
+[OK] saved ckpt\lessData\result\best1.pt (val_loss=0.0077)
+[CKPT] saved -> ckpt\lessData\checkpoint.pt
+[OK] saved ckpt\lessData\result\best1_epe.pt (val_epe=0.0874 m)

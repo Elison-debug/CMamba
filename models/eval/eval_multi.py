@@ -297,6 +297,7 @@ def main():
 
     # --- resolve eval file list ---
     meta = ckpt.get("meta", {}) or {}
+    print(f"[info] args.eval_root is {args.eval_root}")
     if args.eval_root is None:
         if "val_files" in meta and meta["val_files"]:
             val_files = [Path(p) for p in meta["val_files"]]
@@ -309,6 +310,7 @@ def main():
             val_files = sorted(eval_root.glob("*.npz"))
     else:
         eval_root = Path(args.eval_root)
+        print(f"[OK] eval root set to {eval_root}")
         val_files = sorted(eval_root.glob("*.npz"))
     if not val_files:
         raise FileNotFoundError(f"No .npz under {eval_root}")
