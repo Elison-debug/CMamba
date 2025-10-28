@@ -1,6 +1,17 @@
 //---------------------------------------------------------------
 // Module: pipeline_4array_top (v16 - 最终版，广播逻辑明确)
-//
+//   Mode Encoding (3-bit):
+//   -----------------------------------------------------------
+//   | mode | Operation Description          | Formula                           | Output Shape |
+//   |------|--------------------------------|-----------------------------------|---------------|
+//   | 000  | MAC (Matrix × Vector)          | RAW=Wx_pj⊙x_t; Δ_t=W_Δ⊙Δ_raw    | Vector (d_state×1) |
+//   | 001  | EWM-Matrix (Matrix × Vector)   | ΔA = A ⊙ spΔ_t; ΔB_x=spΔ_t ⊙ B_x| Matrix (d_inner×d_state) |
+//   | 010  | EWM-Vector (Vector × Vector)   | D_x = D ⊙ x_t                    | Vector (d_inner×1) |
+//   | 011  | EWM-Outer (Outer Product)      | B_x = x_t ⊗ B_raw; C_h=ht⊗C_raw | Matrix (d_inner×d_state) |
+//   | 100  | EWA-Vector (Vector + Vector)   | y = C_h + D_x; Δ_t_b=Δ_t+dt_bias  | Vector (d_inner×1) |
+//   | 101  | EWA-Matrix (Matrix + Matrix)   | h_t = A_ht-1 + ΔB_x               | Matrix (d_inner×d_state) |
+//   | 110  | EWM-Matrix2 (Matrix × Matrix)  | A_ht-1 = EXP_ΔA ⊙ h_t-1          | Matrix (d_inner×d_state) |
+//   -----------------------------------------------------------
 // Description:
 //  - 架构: A=Mat, B=Vec (I/O: 4xA_mat, 4xB_vec)。
 //  - A 输入 (A_mat) 直接透传。
@@ -57,7 +68,7 @@ module pipeline_4array_top #(
     // ==========================================================
     logic v1, v2, v3, v4;
     logic is_mac_mode;
-    integer i, j; // 用于 B 广播循环
+    //integer i, j; // 用于 B 广播循环
 
     logic signed [ACC_WIDTH-1:0] acc_1_out [TILE_SIZE-1:0][TILE_SIZE-1:0], 
                                 acc_2_out [TILE_SIZE-1:0][TILE_SIZE-1:0],
@@ -81,6 +92,8 @@ module pipeline_4array_top #(
     // 1. B_tile 广播逻辑 (B_vec -> B_tile)
     // ==========================================================
     always_comb begin
+        integer i, j;
+
         // 初始化
         // 初始化移除：由下方 case 分支全覆盖赋值
         for (i = 0; i < TILE_SIZE; i++) begin
@@ -107,7 +120,7 @@ module pipeline_4array_top #(
 
             // 模式 2: 行广播 (Row Broadcast)
             // 用于: EWM/EWA (Mat ⊙ Vec)
-            // 并且用于: 3'b101, 3'b110 (串行化的 Mat + Mat)
+            // 并且用于: 3'b101, 3'b110 (串行化的 Mat + Mat)，一次只有一列有效，没充分利用阵列
             3'b001, 3'b010, 3'b100, 3'b101, 3'b110: begin
                 for (i = 0; i < TILE_SIZE; i++) begin
                     for (j = 0; j < TILE_SIZE; j++) begin
@@ -143,6 +156,7 @@ module pipeline_4array_top #(
 
     // 为避免 packed→unpacked 赋值错误，使用逐元素组合赋值
     always_comb begin
+        integer i, j;
         for (i = 0; i < TILE_SIZE; i++) begin
             for (j = 0; j < TILE_SIZE; j++) begin
                 acc_in_1[i][j] = '0;
