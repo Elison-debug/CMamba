@@ -12,6 +12,7 @@ module reduction_accumulator #(
     input  logic rst_n,
     input  logic valid_in,
     input  logic [2:0] mode,
+    input  logic clear,               // 新增清零信号
     input  logic signed [ACC_WIDTH-1:0] mat_in [TILE_SIZE-1:0][TILE_SIZE-1:0],
 
     output logic signed [ACC_WIDTH-1:0] vec_out [TILE_SIZE-1:0],
@@ -51,20 +52,27 @@ module reduction_accumulator #(
     logic valid_reg;
 
     always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            for (int j = 0; j < TILE_SIZE; j++)
-                acc_vec[j] <= '0;
-            valid_reg <= 1'b0;
-        end
-        else if (is_mac_mode && valid_in) begin
-            for (int j = 0; j < TILE_SIZE; j++)
-                acc_vec[j] <= acc_vec[j] + col_sum[j];
-            valid_reg <= 1'b1;
-        end
-        else begin
-            valid_reg <= 1'b0;
-        end
+    if (!rst_n) begin
+        for (int j = 0; j < TILE_SIZE; j++)
+            acc_vec[j] <= '0;
+        valid_reg <= 1'b0;
     end
+    else if (clear) begin
+        // 每个新 tile 开始时清零累加器
+        for (int j = 0; j < TILE_SIZE; j++)
+            acc_vec[j] <= '0;
+        valid_reg <= 1'b1; //无需清零，保持连续
+    end
+    else if (is_mac_mode && valid_in) begin
+        // 正常累加
+        for (int j = 0; j < TILE_SIZE; j++)
+            acc_vec[j] <= acc_vec[j] + col_sum[j];
+        valid_reg <= 1'b1;
+    end
+    else begin
+        valid_reg <= 1'b0;
+    end
+end
 
     assign vec_out  = acc_vec;
     assign valid_out = valid_reg;

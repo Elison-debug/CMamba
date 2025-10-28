@@ -47,7 +47,9 @@ module pipeline_4array_top #(
     output logic signed [ACC_WIDTH-1:0] result_out_0 [TILE_SIZE-1:0][TILE_SIZE-1:0],
     output logic signed [ACC_WIDTH-1:0] result_out_1 [TILE_SIZE-1:0][TILE_SIZE-1:0],
     output logic signed [ACC_WIDTH-1:0] result_out_2 [TILE_SIZE-1:0][TILE_SIZE-1:0],
-    output logic signed [ACC_WIDTH-1:0] result_out_3 [TILE_SIZE-1:0][TILE_SIZE-1:0]
+    output logic signed [ACC_WIDTH-1:0] result_out_3 [TILE_SIZE-1:0][TILE_SIZE-1:0],
+    // <<< 新增：每个 tile 结束时拉高一拍
+    output logic done_tile   
 );
 
     // ==========================================================
@@ -66,6 +68,9 @@ module pipeline_4array_top #(
     // ==========================================================
     // Internal Signals
     // ==========================================================
+    localparam int COL_BLOCKS = 256 / (TILE_SIZE*4);  // 每 tile 的列分块数 = 64
+    logic [6:0] col_cnt;  // log2(64) = 6，留7位更安全
+
     logic v1, v2, v3, v4;
     logic is_mac_mode;
     //integer i, j; // 用于 B 广播循环
@@ -223,5 +228,35 @@ module pipeline_4array_top #(
     assign result_out_3 = acc_4_out;
 
     assign valid_out  = is_mac_mode ? v4 : v1;
+    
+    // ==========================================================
+    // 5. Tile 完成检测逻辑 (用于驱动 reduction 清零)
+    // ==========================================================
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            col_cnt   <= '0;
+            done_tile <= 1'b0;
+        end
+        else if (is_mac_mode) begin
+            if (valid_out) begin//前4拍还没出结果，计数器应该与结果同步
+                if (col_cnt == COL_BLOCKS - 1) begin
+                    col_cnt   <= '0;
+                    done_tile <= 1'b1;   // 每个 tile 完成时拉高一拍
+                end
+                else begin
+                    col_cnt   <= col_cnt + 1;
+                    done_tile <= 1'b0;
+                end
+            end
+            else begin
+                done_tile <= 1'b0;
+            end
+        end
+        else begin
+            // 非 MAC 模式清零
+            col_cnt   <= '0;
+            done_tile <= 1'b0;
+        end
+    end
 
 endmodule

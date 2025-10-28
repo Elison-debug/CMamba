@@ -7,7 +7,7 @@
 #   例如: 10.0ns = 100MHz, 5.0ns = 200MHz, 4.0ns = 250MHz
 #
 # 这个约束是让 Vivado 进行时序分析的基础。
-create_clock -period 5.000 -name sys_clk [get_ports clk]
+create_clock -period 2.000 -name sys_clk [get_ports clk]
 
 # ====================================================================
 # 2. (可选但推荐) 复位伪路径约束 (False Path for Reset)

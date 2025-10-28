@@ -1,32 +1,19 @@
 `timescale 1ns/1ps
+// golden model for pipeline_4array_with_reduction is not correct
+module tb_pipeline_4array_with_reduction;
 
-module tb_pipeline_4array_top;
-    // ============================================================
-    // Parameters
-    // ============================================================
     localparam int TILE_SIZE  = 4;
     localparam int DATA_WIDTH = 16;
     localparam int ACC_WIDTH  = 32;
     localparam int FRAC_BITS  = 8;
+    localparam int ROWS = 40;
+    localparam int K    = 256;
 
-    localparam int ROWS = 40;   // A rows
-    localparam int K    = 256;  // A cols / B rows
-
-    // ============================================================
-    // Clock / Reset
-    // ============================================================
     logic clk;
     logic rst_n;
-
-    // DUT I/O
     logic [2:0] mode;
-    logic       valid_in;
-    logic       valid_out;
-    logic       done_tile;    // <<< 新增信号
+    logic valid_in, valid_out;
 
-    // ============================================================
-    // DUT array ports
-    // ============================================================
     logic signed [DATA_WIDTH-1:0] A0_mat [TILE_SIZE-1:0][TILE_SIZE-1:0];
     logic signed [DATA_WIDTH-1:0] A1_mat [TILE_SIZE-1:0][TILE_SIZE-1:0];
     logic signed [DATA_WIDTH-1:0] A2_mat [TILE_SIZE-1:0][TILE_SIZE-1:0];
@@ -42,9 +29,9 @@ module tb_pipeline_4array_top;
     logic signed [ACC_WIDTH-1:0] result_out_2 [TILE_SIZE-1:0][TILE_SIZE-1:0];
     logic signed [ACC_WIDTH-1:0] result_out_3 [TILE_SIZE-1:0][TILE_SIZE-1:0];
 
-    // ============================================================
-    // DUT Instance
-    // ============================================================
+    logic done_tile;  // <<< 修改1: 新增信号观测 tile 完成 >>>
+
+    // DUT 实例化
     pipeline_4array_top #(
         .TILE_SIZE (TILE_SIZE),
         .DATA_WIDTH(DATA_WIDTH),
@@ -52,91 +39,65 @@ module tb_pipeline_4array_top;
         .FRAC_BITS (FRAC_BITS)
     ) dut (
         .clk(clk), .rst_n(rst_n),
-        .mode(mode), .valid_in(valid_in),
-        .valid_out(valid_out),
-        .done_tile(done_tile),    // <<< 新增连接
+        .mode(mode), .valid_in(valid_in), .valid_out(valid_out),
         .A0_mat(A0_mat), .A1_mat(A1_mat), .A2_mat(A2_mat), .A3_mat(A3_mat),
         .B0_vec(B0_vec), .B1_vec(B1_vec), .B2_vec(B2_vec), .B3_vec(B3_vec),
         .result_out_0(result_out_0), .result_out_1(result_out_1),
-        .result_out_2(result_out_2), .result_out_3(result_out_3)
+        .result_out_2(result_out_2), .result_out_3(result_out_3),
+        .done_tile(done_tile)  // <<< 修改2: 连接 done_tile >>>
     );
 
-    // ============================================================
-    // Test Data Storage
-    // ============================================================
+    // ---------------- 数据初始化 ----------------
     logic signed [DATA_WIDTH-1:0] A_mem [ROWS-1:0][K-1:0];
     logic signed [DATA_WIDTH-1:0] B_mem [K-1:0];
-
-    longint signed golden   [ROWS-1:0];
+    longint signed golden [ROWS-1:0];
     longint signed dut_accum[ROWS-1:0];
 
     int rb, kb, errors;
 
-    // ============================================================
-    // Clock generation: 10 ns period
-    // ============================================================
     initial begin
         clk = 0;
         forever #5 clk = ~clk;
     end
 
-    // ============================================================
-    // Reset
-    // ============================================================
     initial begin
         rst_n = 0;
-        mode = 3'b000; // MAC mode
+        mode = 3'b000;
         valid_in = 0;
         repeat (10) @(posedge clk);
         rst_n = 1;
     end
 
-    // ============================================================
-    // Helper
-    // ============================================================
     function automatic logic signed [DATA_WIDTH-1:0] to_dw(input integer val);
         logic signed [DATA_WIDTH-1:0] tmp;
         begin tmp = val; to_dw = tmp; end
     endfunction
 
-    // ============================================================
-    // Initialize A, B data
-    // ============================================================
     task automatic init_data;
         int r, k;
         begin
             for (r = 0; r < ROWS; r++) begin
                 for (k = 0; k < K; k++) begin
-                    int aval = ((r % 5) - 2) * (1 << FRAC_BITS);
-                    int kval = ((k % 7) - 3);
-                    A_mem[r][k] = to_dw(aval + kval);
+                    A_mem[r][k] = to_dw(((r % 5) - 2) * (1 << FRAC_BITS) + ((k % 7) - 3));
                 end
             end
-            for (k = 0; k < K; k++) begin
-                int bval = ((k % 9) - 4) * (1 << (FRAC_BITS-1));
-                B_mem[k] = to_dw(bval);
-            end
+            for (k = 0; k < K; k++)
+                B_mem[k] = to_dw(((k % 9) - 4) * (1 << (FRAC_BITS-1)));
         end
     endtask
 
-    // ============================================================
-    // Golden compute
-    // ============================================================
     task automatic compute_golden;
         int r, k;
         begin
             for (r = 0; r < ROWS; r++) begin
                 golden[r] = 0;
-                for (k = 0; k < K; k++) begin
-                    golden[r] += longint'(A_mem[r][k]) * longint'(B_mem[k])*4; //乘4修正
-                end
+                for (k = 0; k < K; k++)
+                    golden[r] += longint'(A_mem[r][k]) * longint'(B_mem[k]) * 4;
             end
         end
     endtask
 
-    // ============================================================
-    // Build tiles: true 4-array pipeline schedule
-    // ============================================================
+    // ---------------- tile 数据生成 ----------------
     task automatic build_tiles_pipeline;
         input int row_base;
         input int k_base;
@@ -147,7 +108,6 @@ module tb_pipeline_4array_top;
             kb2 = k_base - 16 + 4;
             kb3 = k_base - 32 + 8;
             kb4 = k_base - 48 + 12;
-
             for (i = 0; i < TILE_SIZE; i++) begin
                 for (j = 0; j < TILE_SIZE; j++) begin
                     A0_mat[i][j] = (kb1 + j < K && kb1 >= 0) ? A_mem[row_base + i][kb1 + j] : '0;
@@ -156,7 +116,6 @@ module tb_pipeline_4array_top;
                     A3_mat[i][j] = (kb4 + j < K && kb4 >= 0) ? A_mem[row_base + i][kb4 + j] : '0;
                 end
             end
-
             for (j = 0; j < TILE_SIZE; j++) begin
                 B0_vec[j] = (kb1 + j < K && kb1 >= 0) ? B_mem[kb1 + j] : '0;
                 B1_vec[j] = (kb2 + j < K && kb2 >= 0) ? B_mem[kb2 + j] : '0;
@@ -166,22 +125,6 @@ module tb_pipeline_4array_top;
         end
     endtask
 
-    // ============================================================
-    // Drive pipeline one step
-    // ============================================================
-    task automatic drive_macro_step;
-        input int row_base;
-        input int k_base;
-        begin
-            build_tiles_pipeline(row_base, k_base);
-            valid_in <= 1'b1;
-            @(posedge clk);
-        end
-    endtask
-
-    // ============================================================
-    // Capture DUT output
-    // ============================================================
     task automatic capture_and_accum;
         input int row_base;
         int i, j;
@@ -198,44 +141,30 @@ module tb_pipeline_4array_top;
         end
     endtask
 
-    // ============================================================
-    // Monitor done_tile pulse
-    // ============================================================
-    always_ff @(posedge clk) begin
-        if (done_tile)
-            $display("Time %0t ns: DONE_TILE pulse detected.", $time);
-    end
-
-    // ============================================================
-    // Main stimulus
-    // ============================================================
+    // ---------------- 主过程 ----------------
     initial begin
         init_data();
         compute_golden();
-
         for (rb = 0; rb < ROWS; rb++) dut_accum[rb] = 0;
 
         @(posedge rst_n);
         @(posedge clk);
 
-        // ==== 主循环 ====
+        valid_in <= 1'b1; // <<< 修改3: 持续高，不在 tile 之间停4拍 >>>
+
         for (rb = 0; rb < ROWS; rb += TILE_SIZE) begin
-            for (int i = 0; i < TILE_SIZE; i++) dut_accum[rb+i] = 0;
-
-            valid_in <= 1'b1;
             for (int k_base = 0; k_base < K + 48; k_base += 16) begin
-                drive_macro_step(rb, k_base);
-                capture_and_accum(rb);
-            end
-
-            valid_in <= 1'b0;
-            repeat (4) begin
+                build_tiles_pipeline(rb, k_base);
                 @(posedge clk);
                 capture_and_accum(rb);
             end
         end
 
-        // ==== 结果比较 ====
+        valid_in <= 1'b0;
+
+        repeat (8) @(posedge clk);
+
+        // 验证结果
         errors = 0;
         for (rb = 0; rb < ROWS; rb++) begin
             if (dut_accum[rb] !== golden[rb]) begin
