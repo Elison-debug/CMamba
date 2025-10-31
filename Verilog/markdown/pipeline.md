@@ -68,18 +68,10 @@ _Memory Access Pattern & Bank Mapping Overview_
 ## 🧠 Bank Design Summary  
 
 **Bank Count:**  
-$$
-N_\text{bank} = n_\text{array} \times \text{block\_offset}
-$$
-
-- \( n_\text{array} = 4 \)  
-- \( \text{block\_offset} = 3 \)  (since column spacing = 12 = 3 blocks)  
-→ ✅ \( N_\text{bank} = 4 × 3 = 12 \)
+N<sub>bank</sub> = n<sub>array</sub> × block_offset  
 
 **Bank Mapping Function:**  
-$$
-\text{bank\_id} = (\lfloor \tfrac{col}{4} \rfloor + 3 × \text{array\_id}) \bmod N_\text{bank}
-$$
+bank_id = (⌊col / 4⌋ + 3 × array_id) mod N<sub>bank</sub>
 
 ---
 
